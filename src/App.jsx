@@ -1,31 +1,17 @@
 import { useEffect, useState } from 'react'
 
 import logo from './assets/logo.svg'
+import useTheme from './hooks/useTheme'
+import ThemeToggle from './components/ThemeToggle'
+import { galleryImages } from './data/gallery'
+import { kpis } from './data/stats'
+import { contacts as contactsData } from './data/contacts'
+import Header from './components/Header'
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'dark'
-    const stored = localStorage.getItem('theme')
-    if (stored === 'light' || stored === 'dark') return stored
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  })
-  const [userPreferred, setUserPreferred] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('theme') !== null
-  })
+  const { theme, setTheme, userPreferred, setUserPreferred } = useTheme()
 
-  // Real images served from public/
-  const galleryImages = [
-    '/photo1.png',
-    '/photo2.jpg',
-    '/photo3.jpg',
-    '/photo4.jpg',
-    '/photo5.jpg',
-    '/photo6.png',
-    '/photo7.png',
-    '/photo8.png',
-  ]
   const livestockImage = '/photo_pigs.jpeg'
 
   useEffect(() => {
@@ -92,88 +78,7 @@ function App() {
         <div className="absolute inset-0 bg-grid opacity-30 dark:opacity-100 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]" />
       </div>
 
-      {/* Header */}
-      <header className="fixed top-0 inset-x-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-neutral-900/40 border-b border-black/5 dark:border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <a href="#hero" className="flex items-center gap-2">
-            <img src={logo} alt="ФГ «Калина Лошнівська»" className="hidden sm:block h-12 w-auto drop-shadow" />
-            <span className="font-semibold tracking-wide">ФГ «Калина Лошнівська»</span>
-          </a>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-neutral-600 dark:text-neutral-300">
-            <a href="#about" className="hover:text-black dark:hover:text-white transition">Про нас</a>
-            <a href="#crops" className="hover:text-black dark:hover:text-white transition">Рослинництво</a>
-            <a href="#livestock" className="hover:text-black dark:hover:text-white transition">Тваринництво</a>
-            <a href="#social" className="hover:text-black dark:hover:text-white transition">Соцвідповідальність</a>
-            <a href="#team" className="hover:text-black dark:hover:text-white transition">Команда</a>
-            <a href="#gallery" className="hover:text-black dark:hover:text-white transition">Фото</a>
-            <a href="#contact" className="hover:text-black dark:hover:text-white transition">Контакти</a>
-          </nav>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => {
-                // Alt-click: reset to system preference and stop persisting
-                if (e.altKey) {
-                  setUserPreferred(false)
-                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-                  setTheme(prefersDark ? 'dark' : 'light')
-                  return
-                }
-                setUserPreferred(true)
-                setTheme(t => (t === 'dark' ? 'light' : 'dark'))
-              }}
-              className="inline-flex items-center justify-center rounded border border-black/10 dark:border-white/10 h-10 w-10 hover:bg-black/5 dark:hover:bg-white/5"
-              aria-label="Перемкнути тему (Alt — за системою)"
-              aria-pressed={userPreferred ? (theme === 'dark') : undefined}
-              title="Перемкнути тему (Alt — за системою)"
-            >
-              {theme === 'dark' ? (
-                // Moon icon
-                <svg className="h-6 w-6 sm:h-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-                </svg>
-              ) : (
-                // Sun icon
-                <svg className="h-6 w-6 sm:h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="4" />
-                  <line x1="12" y1="2" x2="12" y2="4" />
-                  <line x1="12" y1="20" x2="12" y2="22" />
-                  <line x1="2" y1="12" x2="4" y2="12" />
-                  <line x1="20" y1="12" x2="22" y2="12" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMenuOpen(v => !v)}
-              className="md:hidden inline-flex items-center justify-center h-10 w-10 rounded border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
-              aria-label="Toggle menu"
-              aria-expanded={menuOpen}
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        {menuOpen && (
-          <div className="md:hidden border-t border-black/5 dark:border-white/10 bg-white/70 dark:bg-neutral-900/60 backdrop-blur">
-            <div className="px-4 py-3 space-y-2">
-              <a href="#about" className="block">Про нас</a>
-              <a href="#crops" className="block">Рослинництво</a>
-              <a href="#livestock" className="block">Тваринництво</a>
-              <a href="#social" className="block">Соцвідповідальність</a>
-              <a href="#team" className="block">Команда</a>
-              <a href="#gallery" className="block">Фото</a>
-              <a href="#contact" className="block">Контакти</a>
-            </div>
-          </div>
-        )}
-      </header>
+      <Header theme={theme} setTheme={setTheme} userPreferred={userPreferred} setUserPreferred={setUserPreferred} />
 
       <main className="pt-28">
         {/* Hero */}
@@ -194,13 +99,8 @@ function App() {
                 </div>
                 {/* KPI cards */}
                 <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl">
-                  {[
-                    ['5000+', "га землі"],
-                    ['7000+', "поголів'я свиней"],
-                    ['110+', 'працівників'],
-                    ['12+ млн грн', 'допомоги та гуманітарки'],
-                  ].map(([stat, label]) => (
-                    <div key={label} className="rounded-xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-4 text-center">
+                  {kpis.map(({ id, stat, label }) => (
+                    <div key={id} className="rounded-xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-4 text-center">
                       <div className="text-xl sm:text-2xl font-bold text-black dark:text-white">{stat}</div>
                       <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{label}</div>
                     </div>
@@ -223,7 +123,7 @@ function App() {
         </section>
 
         {/* About */}
-        <section id="about" className="relative py-24">
+        <section id="about" className="relative py-24 scroll-mt-24">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-center text-3xl sm:text-4xl font-extrabold mb-8">Про нас</h2>
             <div className="space-y-4 text-neutral-700 dark:text-neutral-300">
@@ -241,7 +141,7 @@ function App() {
         </section>
 
         {/* Crops */}
-        <section id="crops" className="relative py-24 bg-white/60 dark:bg-white/[0.02] backdrop-blur border-y border-black/10 dark:border-white/10">
+        <section id="crops" className="relative py-24 scroll-mt-24 bg-white/60 dark:bg-white/[0.02] backdrop-blur border-y border-black/10 dark:border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl sm:text-4xl font-extrabold mb-6">Рослинництво</h2>
             <p className="text-neutral-700 dark:text-neutral-300 max-w-3xl">
@@ -266,7 +166,7 @@ function App() {
         </section>
 
         {/* Livestock */}
-        <section id="livestock" className="relative py-24">
+        <section id="livestock" className="relative py-24 scroll-mt-24">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-10 items-start">
               <div>
@@ -300,7 +200,7 @@ function App() {
         </section>
 
         {/* Social responsibility */}
-        <section id="social" className="relative py-24 bg-white/60 dark:bg-white/[0.02] backdrop-blur border-y border-black/10 dark:border-white/10">
+        <section id="social" className="relative py-24 scroll-mt-24 bg-white/60 dark:bg-white/[0.02] backdrop-blur border-y border-black/10 dark:border-white/10">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl sm:text-4xl font-extrabold mb-6">Соціальна відповідальність</h2>
             <p className="text-neutral-700 dark:text-neutral-300 max-w-3xl">
@@ -316,7 +216,7 @@ function App() {
         </section>
 
         {/* Gallery */}
-        <section id="gallery" className="relative py-24 bg-white/60 dark:bg-white/[0.02] backdrop-blur border-y border-black/10 dark:border-white/10">
+        <section id="gallery" className="relative py-24 scroll-mt-24 bg-white/60 dark:bg-white/[0.02] backdrop-blur border-y border-black/10 dark:border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between mb-8">
               <h2 className="text-3xl sm:text-4xl font-extrabold">Фото</h2>
@@ -340,7 +240,7 @@ function App() {
         </section>
 
         {/* Contact */}
-        <section id="contact" className="relative py-24">
+        <section id="contact" className="relative py-24 scroll-mt-24">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-10">
               <div>
@@ -362,30 +262,12 @@ function App() {
 
                 {/* Key contacts */}
                 <div className="mt-6 grid sm:grid-cols-2 gap-3 text-sm text-neutral-700 dark:text-neutral-300">
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
-                    <div className="font-medium">Керівник</div>
-                    <div>Стечишин Алла Василівна — <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="tel:+380962584511">+380 96 258 45 11</a></div>
-                  </div>
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
-                    <div className="font-medium">Заступник з рослинництва</div>
-                    <div>Карачка Богдан Володимирович — <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="tel:+380672102777">+380 67 210 27 77</a></div>
-                  </div>
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
-                    <div className="font-medium">Заступник з тваринництва</div>
-                    <div>Старух Ігор Васильович — <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="tel:+380673123134">+380 67 312 31 34</a></div>
-                  </div>
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
-                    <div className="font-medium">Головний інженер</div>
-                    <div>Стечишин Василь Петрович — <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="tel:+380673541870">+380 67 354 18 70</a></div>
-                  </div>
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
-                    <div className="font-medium">Бухгалтер</div>
-                    <div>Якубівська Марія Євгенівна — <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="tel:+380967229961">+380 96 722 99 61</a></div>
-                  </div>
-                  <div className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
-                    <div className="font-medium">Юрист</div>
-                    <div>Стечишин Христина Василівна — <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="tel:+380980206567">+380 98 020 65 67</a></div>
-                  </div>
+                  {contactsData.map(({ name, position, phone }) => (
+                    <div key={name} className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
+                      <div className="font-medium">{position}</div>
+                      <div>{name} — <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href={`tel:${phone}`}>{phone}</a></div>
+                    </div>
+                  ))}
                 </div>
               </div>
 

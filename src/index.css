@@ -18,9 +18,9 @@
   .animate-gradient { animation: gradient 10s ease infinite; }
   .animate-float { animation: float 6s ease-in-out infinite; }
   .bg-grid {
-    /* Light theme: darker and slightly denser dots for visibility */
-    background-image: radial-gradient(rgba(0,0,0,0.24) 1px, transparent 1px);
-    background-size: 20px 20px;
+    /* Light theme: slightly softer dots */
+    background-image: radial-gradient(rgba(0,0,0,0.20) 1px, transparent 1px);
+    background-size: 18px 18px;
   }
   /* Dark theme: light dots */
   .dark .bg-grid {
@@ -39,3 +39,6 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-float { animation: none !important; }
 }
+
+/* Anchor offset under fixed header */
+#about, #crops, #livestock, #social, #gallery, #contact { scroll-margin-top: 6rem; }
