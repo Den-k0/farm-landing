@@ -14,6 +14,8 @@ function App() {
   const livestockImage = '/photo_pigs.jpeg'
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -21,20 +23,49 @@ function App() {
   }
 
   // (B) Без кастомного fetch — нативне надсилання
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (submitting) return
     setStatus({ type: null, msg: '' })
     const { firstName, email, message } = formState
     if (!firstName.trim() || !email.trim() || !message.trim()) {
-      e.preventDefault()
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
       return
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      e.preventDefault()
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
-    // Якщо все ок — не перешкоджаємо стандартному submit (Netlify обробить)
+
+    let token = ''
+    try { if (window.grecaptcha?.getResponse) token = window.grecaptcha.getResponse() || '' } catch {}
+
+    setSubmitting(true)
+    try {
+      const formEl = e.target
+      const fd = new FormData(formEl)
+      fd.set('firstName', formState.firstName)
+      fd.set('lastName', formState.lastName)
+      fd.set('email', formState.email)
+      fd.set('message', formState.message)
+      if (!fd.get('form-name')) fd.set('form-name', 'contact')
+      if (token) fd.set('g-recaptcha-response', token)
+
+      const body = new URLSearchParams(fd).toString()
+      const res = await fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body
+      })
+      if (!res.ok) throw new Error('Submit failed ' + res.status)
+      setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
+      setFormState({ firstName: '', lastName: '', email: '', message: '' })
+      try { if (window.grecaptcha?.reset) window.grecaptcha.reset() } catch {}
+    } catch (err) {
+      setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   useEffect(() => {
@@ -349,10 +380,20 @@ function App() {
                   required
                   maxLength={2000}
                 />
+                {recaptchaSiteKey && (
+                  <div className="g-recaptcha" data-sitekey={recaptchaSiteKey}></div>
+                )}
+                {!recaptchaSiteKey && (
+                  <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY.</div>
+                )}
+                {status.type && (
+                  <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
+                )}
                 <button
-                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
+                  disabled={submitting}
+                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
                 >
-                  Надіслати
+                  {submitting ? 'Надсилання…' : 'Надіслати'}
                 </button>
                 <p className="text-xs text-neutral-500 dark:text-neutral-500">Захищено reCAPTCHA: Google Privacy Policy & Terms apply.</p>
               </form>
