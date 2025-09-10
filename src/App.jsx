@@ -31,9 +31,8 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setStatus({ type: null, msg: '' })
-    const token = window.grecaptcha?.getResponse(
-      recaptchaWidgetIdRef.current != null ? recaptchaWidgetIdRef.current : undefined
-    ) || ''
+    const widgetId = recaptchaWidgetIdRef.current
+    const token = widgetId != null ? (window.grecaptcha?.getResponse(widgetId) || '') : (document.querySelector('textarea[name="g-recaptcha-response"]')?.value || '')
     if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
       return
@@ -42,26 +41,30 @@ function App() {
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
-    if (!token) {
+    if (recaptchaSiteKey && !token) {
       setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
       return
     }
     setSubmitting(true)
     try {
-      const body = encode({ 'form-name': 'contact', ...formState, 'g-recaptcha-response': token })
+      const bodyData = { 'form-name': 'contact', ...formState, 'bot-field': '' }
+      if (token) bodyData['g-recaptcha-response'] = token
+      const body = encode(bodyData)
       const res = await fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
         body,
       })
       const text = await res.text()
+      if (import.meta.env.DEV) console.log('[Form debug] status', res.status, text.slice(0, 200))
       if (!res.ok) throw new Error(text || 'Failed')
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      if (window.grecaptcha && recaptchaWidgetIdRef.current != null) {
-        try { window.grecaptcha.reset(recaptchaWidgetIdRef.current) } catch {}
+      if (window.grecaptcha && widgetId != null) {
+        try { window.grecaptcha.reset(widgetId) } catch {}
       }
     } catch (err) {
+      if (import.meta.env.DEV) console.error('[Form debug] submit error', err)
       setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
     } finally {
       setSubmitting(false)
@@ -153,6 +156,45 @@ function App() {
       }
     }
     tryRender()
+  }, [recaptchaSiteKey, theme])
+
+  useEffect(() => {
+    // Надійний автоматичний render reCAPTCHA (fallback якщо авто не зʼявився)
+    if (!recaptchaSiteKey) return
+    const container = recaptchaContainerRef.current
+    if (!container) return
+    let cancelled = false
+    let tries = 0
+    const max = 50
+    const ensureTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+    const loop = () => {
+      if (cancelled) return
+      const hasIframe = !!container.querySelector('iframe')
+      if (window.grecaptcha?.render) {
+        // Якщо тема змінилась — перерендеримо
+        const currentTheme = container.getAttribute('data-theme')
+        if (recaptchaWidgetIdRef.current != null && currentTheme !== ensureTheme) {
+          // повний перерендер
+            try { container.innerHTML = '' } catch {}
+            recaptchaWidgetIdRef.current = null
+        }
+        if (recaptchaWidgetIdRef.current == null) {
+          try {
+            recaptchaWidgetIdRef.current = window.grecaptcha.render(container, { sitekey: recaptchaSiteKey, theme: ensureTheme })
+            container.setAttribute('data-theme', ensureTheme)
+            if (import.meta.env.DEV) console.log('[reCAPTCHA] rendered id=', recaptchaWidgetIdRef.current)
+          } catch (e) {
+            if (import.meta.env.DEV) console.warn('[reCAPTCHA] render error', e)
+          }
+        }
+        return
+      }
+      if (!hasIframe && tries++ < max) {
+        setTimeout(loop, 300)
+      }
+    }
+    loop()
+    return () => { cancelled = true }
   }, [recaptchaSiteKey, theme])
 
   return (
@@ -415,8 +457,8 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* reCAPTCHA widget (manual render to guarantee visibility) */}
-                <div ref={recaptchaContainerRef} className="mt-1" />
+                {/* reCAPTCHA widget container (auto/manual render) */}
+                <div ref={recaptchaContainerRef} data-netlify-recaptcha="true" className="mt-1" />
                 {!recaptchaSiteKey && (
                   <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
                 )}
