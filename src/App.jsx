@@ -17,6 +17,7 @@ function App() {
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -28,7 +29,6 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setStatus({ type: null, msg: '' })
-    // Читаємо токен, але не блокуємо якщо його ще немає (Netlify сам валідовує)
     const token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
     if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
@@ -38,21 +38,22 @@ function App() {
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
+    if (!token) {
+      setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
+      return
+    }
     setSubmitting(true)
     try {
-      const bodyData = { 'form-name': 'contact', ...formState }
-      if (token) bodyData['g-recaptcha-response'] = token
-      const body = encode(bodyData)
+      const body = encode({ 'form-name': 'contact', ...formState, 'g-recaptcha-response': token })
       const res = await fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
         body,
       })
-      const text = await res.text() // для діагностики
+      const text = await res.text()
       if (!res.ok) throw new Error(text || 'Failed')
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      // Спробуємо скинути widget якщо присутній
       if (window.grecaptcha) {
         try { window.grecaptcha.reset() } catch {}
       }
@@ -373,8 +374,11 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* reCAPTCHA офіційний placeholder */}
-                <div data-netlify-recaptcha="true" />
+                {/* reCAPTCHA widget (manual visible) */}
+                <div className="g-recaptcha" data-sitekey={recaptchaSiteKey || 'missing_site_key'} />
+                {!recaptchaSiteKey && (
+                  <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
+                )}
                 {status.type && (
                   <div className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
                 )}
