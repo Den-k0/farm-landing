@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ФГ «Калина Лошнівська» — офіційна сторінка</title>
+    <meta name="description" content="Фермерське господарство «Калина Лошнівська»: рослинництво, тваринництво, соціальна відповідальність. Контакти, фото, команда." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ФГ «Калина Лошнівська» — офіційна сторінка" />
+    <meta property="og:description" content="Рослинництво та тваринництво в Тернопільській області. 5000+ га, 7000+ голів свиней. Контакти та галерея." />
+    <meta property="og:image" content="/photo1.png" />
+    <meta property="og:locale" content="uk_UA" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ФГ «Калина Лошнівська» — офіційна сторінка" />
+    <meta name="twitter:description" content="Рослинництво та тваринництво в Тернопільській області. 5000+ га, 7000+ голів свиней." />
+    <meta name="twitter:image" content="/photo1.png" />
+    <script>
+      (() => {
+        try {
+          const ls = localStorage.getItem('theme')
+            , mql = window.matchMedia('(prefers-color-scheme: dark)')
+            , isDark = ls ? ls === 'dark' : mql.matches
+          if (isDark) document.documentElement.classList.add('dark')
+        } catch {}
+      })()
+      // Bridge global callback expected by reCAPTCHA (onRecaptchaLoad) to the hook's internal one (__onRecaptchaGlobal)
+      window.onRecaptchaLoad = function () {
+        if (typeof window.__onRecaptchaGlobal === 'function') {
+          window.__onRecaptchaGlobal()
+        }
+      }
+    </script>
+    <!-- Updated reCAPTCHA script for explicit rendering with onload callback -->
+    <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
+  </head>
+  <body>
+    <!-- Hidden Netlify registration form (parsed at build). Includes reCAPTCHA placeholder so Netlify enables spam protection. -->
+    <form name="contact" data-netlify="true" netlify-honeypot="bot-field" hidden>
+      <input type="hidden" name="form-name" value="contact" />
+      <input type="text" name="firstName" />
+      <input type="text" name="lastName" />
+      <input type="email" name="email" />
+      <textarea name="message"></textarea>
+      <input name="bot-field" />
+      <input type="hidden" name="g-recaptcha-response" />
+    </form>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
