@@ -29,6 +29,7 @@ export default function Contact() {
     const inner = document.createElement('div')
     captchaRef.current.appendChild(inner)
     const currentVersion = ++renderVersionRef.current
+    console.debug('[reCAPTCHA] rendering version', currentVersion, 'theme=', theme)
     try {
       captchaIdRef.current = window.grecaptcha.render(inner, {
         sitekey: RECAPTCHA_SITE_KEY,
@@ -55,23 +56,30 @@ export default function Contact() {
     window.onRecaptchaLoad = () => {
       if (typeof prev === 'function') { try { prev() } catch {} }
       recaptchaLoadedRef.current = true
+      console.debug('[reCAPTCHA] script loaded')
       initialRender()
     }
     if (window.grecaptcha && window.grecaptcha.render) {
       recaptchaLoadedRef.current = true
+      console.debug('[reCAPTCHA] script already present')
       initialRender()
     }
   }, [])
 
-  // Theme change => full rebuild (old behaviour)
+  // Theme change => full rebuild (old behaviour) with slight delay to ensure reset fully applies.
   useEffect(() => {
     if (!recaptchaLoadedRef.current) return
     if (!window.grecaptcha) return
+    console.debug('[reCAPTCHA] theme change detected =>', theme)
     if (captchaIdRef.current !== null) {
       try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
       captchaIdRef.current = null
     }
-    performRender()
+    // Small delay (next animation frame) avoids rare race where immediate re-render keeps old theme.
+    requestAnimationFrame(() => {
+      // Extra tiny timeout (0) to yield after frame paint in Safari.
+      setTimeout(() => performRender(), 0)
+    })
   }, [theme])
 
   // --- FORM HANDLERS ---
