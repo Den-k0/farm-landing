@@ -18,31 +18,6 @@ function App() {
   const iframeRef = useRef(null)
   const pendingSubmitRef = useRef(false)
 
-  // Manual reCAPTCHA
-  const recaptchaRef = useRef(null)
-  const recaptchaWidgetIdRef = useRef(null)
-  const [captchaReady, setCaptchaReady] = useState(false)
-  const [captchaVerified, setCaptchaVerified] = useState(false)
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY || '6LdnkKEqAAAAAPvyqoRAmjXxvE6evlb5z-5Ol90Y'
-
-  useEffect(() => {
-    window.onRecaptchaLoad = () => {
-      if (!recaptchaRef.current || !window.grecaptcha || recaptchaWidgetIdRef.current != null) return
-      try {
-        recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaRef.current, {
-          sitekey: siteKey,
-          callback: () => setCaptchaVerified(true),
-          'expired-callback': () => setCaptchaVerified(false),
-          'error-callback': () => setCaptchaVerified(false),
-        })
-        setCaptchaReady(true)
-      } catch {}
-    }
-    if (window.grecaptcha?.render && recaptchaWidgetIdRef.current == null) {
-      window.onRecaptchaLoad()
-    }
-  }, [siteKey])
-
   const handleSubmit = (e) => {
     if (submitting) { e.preventDefault(); return }
     setStatus({ type: null, msg: '' })
@@ -55,11 +30,6 @@ function App() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       e.preventDefault()
       setStatus({ type: 'error', msg: 'Некоректний email.' })
-      return
-    }
-    if (!captchaVerified) {
-      e.preventDefault()
-      setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
       return
     }
     setSubmitting(true)
@@ -76,12 +46,6 @@ function App() {
       setSubmitting(false)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      try {
-        if (window.grecaptcha?.reset && recaptchaWidgetIdRef.current != null) {
-          window.grecaptcha.reset(recaptchaWidgetIdRef.current)
-          setCaptchaVerified(false)
-        }
-      } catch {}
     }
     pendingSubmitRef.current = false
     iframe.addEventListener('load', onLoad)
@@ -97,7 +61,6 @@ function App() {
   }, [theme])
 
   useEffect(() => {
-    // Persist only if user explicitly chose a theme; otherwise, follow system
     if (userPreferred) {
       localStorage.setItem('theme', theme)
     } else {
@@ -106,29 +69,20 @@ function App() {
   }, [theme, userPreferred])
 
   useEffect(() => {
-    // Realtime sync with system theme when user hasn't explicitly chosen
     const mql = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = (e) => {
-      if (!userPreferred) {
-        setTheme(e.matches ? 'dark' : 'light')
-      }
-    }
+    const onChange = (e) => { if (!userPreferred) setTheme(e.matches ? 'dark' : 'light') }
     if (mql.addEventListener) mql.addEventListener('change', onChange)
     else mql.addListener(onChange)
-    return () => {
-      if (mql.removeEventListener) mql.removeEventListener('change', onChange)
-      else mql.removeListener(onChange)
-    }
+    return () => { if (mql.removeEventListener) mql.removeEventListener('change', onChange); else mql.removeListener(onChange) }
   }, [userPreferred])
 
   useEffect(() => {
-    // Simple parallax for background accents (motion-safe only)
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (reduce.matches) return
     const els = document.querySelectorAll('[data-parallax]')
     const onScroll = () => {
       const y = window.scrollY
-      els.forEach((el) => {
+      els.forEach(el => {
         const speed = parseFloat(el.getAttribute('data-parallax') || '0.08')
         el.style.transform = `translateY(${(y * speed).toFixed(1)}px)`
       })
@@ -401,20 +355,16 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div ref={recaptchaRef} className="mt-2">
-                  {!captchaReady && <div className="text-xs text-neutral-500 dark:text-neutral-500">Завантаження reCAPTCHA…</div>}
-                </div>
                 {status.type && (
                   <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
                 )}
                 <button
-                  disabled={submitting || !captchaVerified}
-                  aria-disabled={submitting || !captchaVerified}
+                  disabled={submitting}
+                  aria-disabled={submitting}
                   className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
                 >
-                  {submitting ? 'Надсилання…' : !captchaVerified ? 'Підтвердіть reCAPTCHA' : 'Надіслати'}
+                  {submitting ? 'Надсилання…' : 'Надіслати'}
                 </button>
-                <p className="text-xs text-neutral-500 dark:text-neutral-500">Захищено reCAPTCHA: Google Privacy Policy & Terms apply.</p>
               </form>
               <iframe name="netlify-frame" ref={iframeRef} hidden title="netlify-result" />
             </div>
