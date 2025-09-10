@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 
 import logo from './assets/logo.svg'
 import useTheme from './hooks/useTheme'
@@ -18,8 +18,6 @@ function App() {
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
-  const recaptchaContainerRef = useRef(null)
-  const recaptchaWidgetIdRef = useRef(null)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -31,8 +29,13 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setStatus({ type: null, msg: '' })
-    const widgetId = recaptchaWidgetIdRef.current
-    const token = widgetId != null ? (window.grecaptcha?.getResponse(widgetId) || '') : (document.querySelector('textarea[name="g-recaptcha-response"]')?.value || '')
+    // Отримуємо токен (авто-рендерений віджет створює textarea + API)
+    let token = ''
+    if (window.grecaptcha?.getResponse) {
+      token = window.grecaptcha.getResponse() || ''
+    } else {
+      token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
+    }
     if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
       return
@@ -56,12 +59,12 @@ function App() {
         body,
       })
       const text = await res.text()
-      if (import.meta.env.DEV) console.log('[Form debug] status', res.status, text.slice(0, 200))
+      if (import.meta.env.DEV) console.log('[Form debug] status', res.status, text.slice(0,150))
       if (!res.ok) throw new Error(text || 'Failed')
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      if (window.grecaptcha && widgetId != null) {
-        try { window.grecaptcha.reset(widgetId) } catch {}
+      if (window.grecaptcha?.reset) {
+        try { window.grecaptcha.reset() } catch {}
       }
     } catch (err) {
       if (import.meta.env.DEV) console.error('[Form debug] submit error', err)
@@ -120,82 +123,6 @@ function App() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
-
-  useEffect(() => {
-    // Ручне (re)рендерення reCAPTCHA після монтування і при зміні теми
-    if (!recaptchaSiteKey) return
-    let attempts = 0
-    const maxAttempts = 40
-    const ensureTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-    const tryRender = () => {
-      attempts++
-      if (window.grecaptcha?.render && recaptchaContainerRef.current) {
-        // Якщо була зміна теми — перерендеримо
-        if (recaptchaWidgetIdRef.current != null) {
-          const currentToken = window.grecaptcha.getResponse(recaptchaWidgetIdRef.current)
-          // Якщо theme змінилася — видаляємо і рендеримо заново (reCAPTCHA не оновлює тему динамічно)
-          const iframe = recaptchaContainerRef.current.querySelector('iframe')
-          if (iframe && !recaptchaContainerRef.current.classList.contains('rc-theme-'+ensureTheme)) {
-            recaptchaContainerRef.current.innerHTML = ''
-            recaptchaWidgetIdRef.current = null
-          } else if (iframe) {
-            return // вже відрендерено з потрібною темою
-          }
-        }
-        if (recaptchaWidgetIdRef.current == null) {
-          try {
-            recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaContainerRef.current, {
-              sitekey: recaptchaSiteKey,
-              theme: ensureTheme,
-            })
-            recaptchaContainerRef.current.classList.add('rc-theme-'+ensureTheme)
-          } catch (e) {}
-        }
-      } else if (attempts < maxAttempts) {
-        setTimeout(tryRender, 300)
-      }
-    }
-    tryRender()
-  }, [recaptchaSiteKey, theme])
-
-  useEffect(() => {
-    // Надійний автоматичний render reCAPTCHA (fallback якщо авто не зʼявився)
-    if (!recaptchaSiteKey) return
-    const container = recaptchaContainerRef.current
-    if (!container) return
-    let cancelled = false
-    let tries = 0
-    const max = 50
-    const ensureTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-    const loop = () => {
-      if (cancelled) return
-      const hasIframe = !!container.querySelector('iframe')
-      if (window.grecaptcha?.render) {
-        // Якщо тема змінилась — перерендеримо
-        const currentTheme = container.getAttribute('data-theme')
-        if (recaptchaWidgetIdRef.current != null && currentTheme !== ensureTheme) {
-          // повний перерендер
-            try { container.innerHTML = '' } catch {}
-            recaptchaWidgetIdRef.current = null
-        }
-        if (recaptchaWidgetIdRef.current == null) {
-          try {
-            recaptchaWidgetIdRef.current = window.grecaptcha.render(container, { sitekey: recaptchaSiteKey, theme: ensureTheme })
-            container.setAttribute('data-theme', ensureTheme)
-            if (import.meta.env.DEV) console.log('[reCAPTCHA] rendered id=', recaptchaWidgetIdRef.current)
-          } catch (e) {
-            if (import.meta.env.DEV) console.warn('[reCAPTCHA] render error', e)
-          }
-        }
-        return
-      }
-      if (!hasIframe && tries++ < max) {
-        setTimeout(loop, 300)
-      }
-    }
-    loop()
-    return () => { cancelled = true }
-  }, [recaptchaSiteKey, theme])
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 selection:bg-emerald-400/30 selection:text-emerald-100 font-sans">
@@ -457,8 +384,8 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* reCAPTCHA widget container (auto/manual render) */}
-                <div ref={recaptchaContainerRef} data-netlify-recaptcha="true" className="mt-1" />
+                {/* reCAPTCHA: авто-рендер Google */}
+                <div className="g-recaptcha" data-sitekey={recaptchaSiteKey || 'missing_site_key'} />
                 {!recaptchaSiteKey && (
                   <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
                 )}
