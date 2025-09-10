@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { contacts as contactsData } from '../../data/contacts'
 import useTheme from '../../hooks/useTheme'
 import { encode, validateContact } from '../../utils/form'
@@ -6,8 +6,9 @@ import { encode, validateContact } from '../../utils/form'
 const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
 
 export default function Contact() {
+  // Ensure theme side-effects (class toggling) run, value itself not needed here
+  useTheme()
   // --- FORM STATE ---
-  const { theme } = useTheme() // keep for other UI, but reCAPTCHA rebuild will watch DOM class directly
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
@@ -19,15 +20,16 @@ export default function Contact() {
   const recaptchaLoadedRef = useRef(false)
   const renderVersionRef = useRef(0)
   const [captchaReady, setCaptchaReady] = useState(false)
+  const readyRef = useRef(false)
   const lastDomThemeRef = useRef(null)
 
   const getDomTheme = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
 
-  const performRender = () => {
+  const performRender = useCallback(() => {
     if (!window.grecaptcha || !captchaRef.current) return
     if (!RECAPTCHA_SITE_KEY) { console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set)'); return }
     const domTheme = getDomTheme()
-    setCaptchaReady(false)
+    setCaptchaReady(false); readyRef.current = false
     while (captchaRef.current.firstChild) captchaRef.current.removeChild(captchaRef.current.firstChild)
     const inner = document.createElement('div')
     // give inner a unique id each time to avoid any internal caching quirks
@@ -43,23 +45,22 @@ export default function Contact() {
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
         'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
       })
-      setTimeout(() => { if (renderVersionRef.current === currentVersion) setCaptchaReady(true) }, 60)
-    } catch (e) {
-      console.warn('[reCAPTCHA] render error', e)
-      setTimeout(() => { if (renderVersionRef.current === currentVersion && !captchaReady) performRender() }, 400)
-    }
-  }
+      setTimeout(() => { if (renderVersionRef.current === currentVersion) { setCaptchaReady(true); readyRef.current = true } }, 60)
+    } catch { /* ignore render error, retry below */ }
+    // retry if still not ready after short delay
+    setTimeout(() => { if (renderVersionRef.current === currentVersion && !readyRef.current) performRender() }, 400)
+  }, [])
 
-  const initialRender = () => {
+  const initialRender = useCallback(() => {
     if (!window.grecaptcha || !captchaRef.current || captchaIdRef.current !== null) return
     performRender()
-  }
+  }, [performRender])
 
-  // Script load -> first render (old logic clone)
+  // Script load -> first render
   useEffect(() => {
     const prev = window.onRecaptchaLoad
     window.onRecaptchaLoad = () => {
-      if (typeof prev === 'function') { try { prev() } catch {} }
+      if (typeof prev === 'function') { try { prev() } catch { /* ignore previous callback error */ } }
       recaptchaLoadedRef.current = true
       console.debug('[reCAPTCHA] script loaded')
       initialRender()
@@ -71,12 +72,10 @@ export default function Contact() {
       initialRender()
       lastDomThemeRef.current = getDomTheme()
     }
-  }, [])
+  }, [initialRender])
 
   // Observe actual DOM class changes to trigger re-render AFTER class switched.
   useEffect(() => {
-    const html = document.documentElement
-    lastDomThemeRef.current = getDomTheme()
     const observer = new MutationObserver(() => {
       const currentDomTheme = getDomTheme()
       if (currentDomTheme === lastDomThemeRef.current) return
@@ -84,15 +83,15 @@ export default function Contact() {
       if (!recaptchaLoadedRef.current || !window.grecaptcha) return
       console.debug('[reCAPTCHA] detected DOM theme change =>', currentDomTheme, 'rebuilding widget')
       if (captchaIdRef.current !== null) {
-        try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
+        try { window.grecaptcha.reset(captchaIdRef.current) } catch { /* ignore */ }
         captchaIdRef.current = null
       }
-      // delay one frame to ensure previous iframe fully detached
       requestAnimationFrame(() => setTimeout(() => performRender(), 0))
     })
+    const html = document.documentElement
     observer.observe(html, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
-  }, [])
+  }, [performRender])
 
   // --- FORM HANDLERS ---
   const onChange = (field) => (e) => setFormState(s => ({ ...s, [field]: e.target.value }))
@@ -114,12 +113,11 @@ export default function Contact() {
       if (response.ok) {
         setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
         setFormState({ firstName: '', lastName: '', email: '', message: '' })
-        if (window.grecaptcha && captchaIdRef.current !== null) { try { window.grecaptcha.reset(captchaIdRef.current) } catch {} }
+        if (window.grecaptcha && captchaIdRef.current !== null) { try { window.grecaptcha.reset(captchaIdRef.current) } catch { /* ignore */ } }
         setLastSubmitTime(Date.now())
       } else throw new Error('Network error')
-    } catch {
-      setStatus({ type: 'error', msg: 'Помилка при надсиланні. Спробуйте ще раз.' })
-    } finally { setSubmitting(false) }
+    } catch { setStatus({ type: 'error', msg: 'Помилка при надсиланні. Спробуйте ще раз.' }) }
+    finally { setSubmitting(false) }
   }
 
   return (
