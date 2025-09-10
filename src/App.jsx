@@ -20,65 +20,37 @@ function App() {
   const captchaIdRef = useRef(null)
   const [captchaReady, setCaptchaReady] = useState(false)
 
+  // Спрощена версія: рендеримо reCAPTCHA один раз. При зміні теми не перерисовуємо (v2 checkbox не підтримує live зміну теми).
   const renderCaptcha = () => {
-    if (!window.grecaptcha || !captchaRef.current) return false
+    if (captchaIdRef.current !== null) return // вже відрендерено
+    if (!window.grecaptcha || !captchaRef.current) return
     if (!RECAPTCHA_SITE_KEY) {
       console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set in environment)')
-      return false
+      return
     }
     try {
-      setCaptchaReady(false)
-      captchaRef.current.innerHTML = ''
       captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
         sitekey: RECAPTCHA_SITE_KEY,
-        theme: theme === 'dark' ? 'dark' : 'light',
+        theme: theme === 'dark' ? 'dark' : 'light', // Тема фіксується на момент першого рендеру
         callback: () => {},
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
         'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
       })
       setCaptchaReady(true)
-      return true
     } catch (e) {
       console.error('reCAPTCHA render error:', e)
-      return false
     }
   }
 
   useEffect(() => {
     window.onRecaptchaLoad = () => {
-      // Рендеримо один раз при завантаженні скрипта
-      if (captchaIdRef.current === null) renderCaptcha()
-    }
-    if (window.grecaptcha && window.grecaptcha.render && captchaIdRef.current === null) {
       renderCaptcha()
     }
-    return () => {
-      // при демонтажі очищаємо callback
-      delete window.onRecaptchaLoad
+    if (window.grecaptcha && window.grecaptcha.render) {
+      renderCaptcha()
     }
+    return () => { delete window.onRecaptchaLoad }
   }, [])
-
-  // Надійне перерендерення при зміні теми (з повторними спробами, якщо скрипт ще не готовий)
-  useEffect(() => {
-    let cancelled = false
-    let attempts = 0
-    const maxAttempts = 20 // ~2 сек при 100мс
-    const attempt = () => {
-      if (cancelled) return
-      if (window.grecaptcha && window.grecaptcha.render) {
-        const ok = renderCaptcha()
-        if (!ok && attempts < maxAttempts) {
-          attempts++
-          setTimeout(attempt, 100)
-        }
-      } else if (attempts < maxAttempts) {
-        attempts++
-        setTimeout(attempt, 100)
-      }
-    }
-    attempt()
-    return () => { cancelled = true }
-  }, [theme])
 
   const encode = (data) => {
     return Object.keys(data)
@@ -402,7 +374,7 @@ function App() {
                   maxLength={2000}
                 />
                 <div className="space-y-2">
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Захист reCAPTCHA</div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Захист reCAPTCHA (тема фіксується при першому завантаженні)</div>
                   <div ref={captchaRef} id="recaptcha-container" className="pt-1 min-h-[78px] flex items-center" aria-label="reCAPTCHA">
                     {!captchaReady && <div className="animate-pulse h-10 w-64 rounded bg-neutral-200 dark:bg-neutral-700" />}
                   </div>
