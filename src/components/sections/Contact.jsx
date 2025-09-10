@@ -24,7 +24,7 @@ export default function Contact() {
 
   const performRender = useCallback(() => {
     if (!window.grecaptcha || !captchaRef.current) return
-    if (!RECAPTCHA_SITE_KEY) { console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set)'); return }
+    if (!RECAPTCHA_SITE_KEY) { return }
     const domTheme = getDomTheme()
     setCaptchaReady(false); readyRef.current = false
     while (captchaRef.current.firstChild) captchaRef.current.removeChild(captchaRef.current.firstChild)
@@ -32,7 +32,6 @@ export default function Contact() {
     inner.id = `recaptcha-inner-${Date.now()}-${Math.random().toString(36).slice(2)}`
     captchaRef.current.appendChild(inner)
     const currentVersion = ++renderVersionRef.current
-    console.debug('[reCAPTCHA] render v', currentVersion, 'theme=', domTheme)
     try {
       captchaIdRef.current = window.grecaptcha.render(inner, {
         sitekey: RECAPTCHA_SITE_KEY,
@@ -56,13 +55,11 @@ export default function Contact() {
     window.onRecaptchaLoad = () => {
       if (typeof prev === 'function') { try { prev() } catch {} }
       recaptchaLoadedRef.current = true
-      console.debug('[reCAPTCHA] script loaded')
       initialRender()
       lastDomThemeRef.current = getDomTheme()
     }
     if (window.grecaptcha && window.grecaptcha.render) {
       recaptchaLoadedRef.current = true
-      console.debug('[reCAPTCHA] script already present')
       initialRender()
       lastDomThemeRef.current = getDomTheme()
     }
@@ -74,7 +71,6 @@ export default function Contact() {
       if (currentDomTheme === lastDomThemeRef.current) return
       lastDomThemeRef.current = currentDomTheme
       if (!recaptchaLoadedRef.current || !window.grecaptcha) return
-      console.debug('[reCAPTCHA] detected DOM theme change =>', currentDomTheme, 'rebuilding widget')
       if (captchaIdRef.current !== null) {
         try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
         captchaIdRef.current = null
