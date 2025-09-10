@@ -17,8 +17,7 @@ function App() {
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
-  // Support both Vite-exposed key and legacy name (must duplicate in .env to expose)
-  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
+  // const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY // (disabled for test)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -27,40 +26,24 @@ function App() {
 
   const encode = (data) => Object.keys(data).map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(data[k])).join('&')
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setStatus({ type: null, msg: '' })
-    const token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
-    if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
-      setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
-      return
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
-      setStatus({ type: 'error', msg: 'Некоректний email.' })
-      return
-    }
-    if (!token) {
-      setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
-      return
-    }
-    setSubmitting(true)
-    try {
-      const body = encode({ 'form-name': 'contact', ...formState, 'g-recaptcha-response': token })
-      const res = await fetch('/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-      })
-      if (!res.ok) throw new Error('Failed')
-      setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
-      setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      if (window.grecaptcha) window.grecaptcha.reset()
-    } catch (err) {
-      setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault()
+  //   setStatus({ type: null, msg: '' })
+  //   const token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
+  //   if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
+  //     setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
+  //     return
+  //   }
+  //   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
+  //     setStatus({ type: 'error', msg: 'Некоректний email.' })
+  //     return
+  //   }
+  //   if (!token) {
+  //     setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
+  //     return
+  //   }
+  //   // Disabled custom fetch for diagnostic. Using native POST.
+  // }
 
   useEffect(() => {
     const root = document.documentElement
@@ -322,16 +305,18 @@ function App() {
               {/* Right column: form card with heading inside */}
               <form
                 name="contact"
+                method="POST"
+                action="/"
                 data-netlify="true"
                 netlify-honeypot="bot-field"
-                onSubmit={handleSubmit}
+                // onSubmit={handleSubmit} // disabled for native test
                 className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur p-6 space-y-4"
               >
                 <input type="hidden" name="form-name" value="contact" />
                 <p className="hidden">
                   <label>
                     Не заповнюйте це поле:{' '}
-                    <input name="bot-field" onChange={() => {}} />
+                    <input name="bot-field" />
                   </label>
                 </p>
                 <h3 className="text-xl font-semibold">Напишіть нам</h3>
@@ -342,7 +327,7 @@ function App() {
                     placeholder="Імʼя *"
                     name="firstName"
                     value={formState.firstName}
-                    onChange={handleChange}
+                    onChange={(e)=>setFormState({...formState, firstName: e.target.value})}
                     required
                   />
                   <input
@@ -350,7 +335,7 @@ function App() {
                     placeholder="Прізвище"
                     name="lastName"
                     value={formState.lastName}
-                    onChange={handleChange}
+                    onChange={(e)=>setFormState({...formState, lastName: e.target.value})}
                   />
                 </div>
                 <input
@@ -359,7 +344,7 @@ function App() {
                   name="email"
                   type="email"
                   value={formState.email}
-                  onChange={handleChange}
+                  onChange={(e)=>setFormState({...formState, email: e.target.value})}
                   required
                 />
                 <textarea
@@ -368,25 +353,18 @@ function App() {
                   placeholder="Повідомлення *"
                   name="message"
                   value={formState.message}
-                  onChange={handleChange}
+                  onChange={(e)=>setFormState({...formState, message: e.target.value})}
                   required
                   maxLength={2000}
                 />
-                {/* Manual reCAPTCHA widget */}
+                {/* reCAPTCHA temporarily disabled for diagnostic */}
                 {/* <div className="g-recaptcha" data-sitekey={recaptchaSiteKey || 'missing_site_key'} /> */}
-                {!recaptchaSiteKey && (
-                  <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
-                )}
-                {status.type && (
-                  <div className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
-                )}
                 <button
-                  disabled={submitting}
-                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
+                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
                 >
-                  {submitting ? 'Надсилання…' : 'Надіслати'}
+                  Надіслати (тест без reCAPTCHA)
                 </button>
-                <p className="text-xs text-neutral-500 dark:text-neutral-500">Захищено reCAPTCHA: Google Privacy Policy & Terms apply.</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-500">Тест: reCAPTCHA вимкнена. Має зʼявитися запис у Netlify Forms.</p>
               </form>
             </div>
           </div>
