@@ -373,7 +373,7 @@ function App() {
                   maxLength={2000}
                 />
                 {/* Manual reCAPTCHA widget */}
-                <div className="g-recaptcha" data-sitekey={recaptchaSiteKey || 'missing_site_key'} />
+                {/* <div className="g-recaptcha" data-sitekey={recaptchaSiteKey || 'missing_site_key'} /> */}
                 {!recaptchaSiteKey && (
                   <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
                 )}
