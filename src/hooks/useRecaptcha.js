@@ -1,51 +1,90 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 /**
- * Hook to encapsulate Google reCAPTCHA v2 (explicit render) logic with dark/light theme re-render.
- * Returns refs & helpers: containerRef (attach div), ready (bool), getToken(), reset(), rerender().
+ * Google reCAPTCHA v2 explicit render hook with theme re-render + debug.
  */
 export default function useRecaptcha(siteKey, themeSource = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light')) {
   const containerRef = useRef(null)
   const widgetIdRef = useRef(null)
   const loadedRef = useRef(false)
   const renderVersionRef = useRef(0)
+  const attemptRef = useRef(0)
   const [ready, setReady] = useState(false)
 
+  const debug = (msg, extra) => {
+    // Minimal noisy logging only when not in production or when explicitly desired.
+    if (typeof window !== 'undefined') {
+      // Always log for now to diagnose missing widget.
+      console.log('[reCAPTCHA]', msg, extra || '')
+    }
+  }
+
   const renderCaptcha = useCallback(() => {
-    if (!window.grecaptcha || !containerRef.current || !siteKey) return
+    if (!siteKey) { debug('Abort: empty siteKey'); return }
+    if (!window.grecaptcha) { debug('Abort: grecaptcha not ready'); return }
+    if (!containerRef.current) { debug('Abort: container missing'); return }
+
     setReady(false)
     while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild)
     const inner = document.createElement('div')
+    inner.setAttribute('data-recaptcha-inner', 'true')
     containerRef.current.appendChild(inner)
     const currentVersion = ++renderVersionRef.current
+    const attempt = ++attemptRef.current
+    debug('Render attempt', { attempt, version: currentVersion, theme: themeSource() })
     try {
       widgetIdRef.current = window.grecaptcha.render(inner, {
         sitekey: siteKey,
         theme: themeSource(),
-        callback: () => {},
-        'error-callback': () => setReady(false),
-        'expired-callback': () => setReady(false)
+        callback: () => { debug('Solved callback'); },
+        'error-callback': () => { debug('Error callback'); setReady(false) },
+        'expired-callback': () => { debug('Expired callback'); setReady(false) }
       })
-      setTimeout(() => { if (renderVersionRef.current === currentVersion) setReady(true) }, 60)
+      // Post render check
+      setTimeout(() => {
+        if (renderVersionRef.current === currentVersion) {
+          const iframe = containerRef.current?.querySelector('iframe')
+          if (iframe) {
+            setReady(true)
+            debug('Render success (iframe present)', { attempt })
+          } else {
+            debug('Iframe not found yet; scheduling retry', { attempt })
+            setTimeout(() => { if (renderVersionRef.current === currentVersion && !ready) renderCaptcha() }, 400)
+          }
+        }
+      }, 80)
     } catch (err) {
-      console.warn('reCAPTCHA render error', err)
-      setTimeout(() => { if (renderVersionRef.current === currentVersion && !ready) renderCaptcha() }, 400)
+      debug('Render exception', err)
+      setTimeout(() => { if (renderVersionRef.current === currentVersion && !ready) renderCaptcha() }, 500)
     }
-  }, [ready, siteKey, themeSource])
+  }, [siteKey, themeSource, ready])
 
+  // Load bridge or immediate render
   useEffect(() => {
     const cbName = '__onRecaptchaGlobal'
     if (!window[cbName]) {
-      window[cbName] = () => { loadedRef.current = true; renderCaptcha() }
+      window[cbName] = () => { debug('Global onload callback'); loadedRef.current = true; renderCaptcha() }
+      debug('Registered global callback placeholder')
     }
-    if (window.grecaptcha && window.grecaptcha.render) { loadedRef.current = true; renderCaptcha() }
+    if (window.grecaptcha && window.grecaptcha.render) {
+      debug('grecaptcha already present; rendering immediately')
+      loadedRef.current = true
+      renderCaptcha()
+    } else {
+      // Fallback: if after 2s still no grecaptcha, attempt to re-trigger (script might be blocked)
+      const t = setTimeout(() => { if (!window.grecaptcha) debug('Still no grecaptcha after 2000ms') }, 2000)
+      return () => clearTimeout(t)
+    }
   }, [renderCaptcha])
 
+  // Watch theme changes via class mutation.
   useEffect(() => {
     const html = document.documentElement
     const obs = new MutationObserver(() => {
       if (!loadedRef.current || !window.grecaptcha) return
-      try { if (widgetIdRef.current !== null) window.grecaptcha.reset(widgetIdRef.current) } catch (err) { console.warn('reCAPTCHA reset error', err) }
+      try {
+        if (widgetIdRef.current !== null) window.grecaptcha.reset(widgetIdRef.current)
+      } catch (err) { debug('Reset error', err) }
       widgetIdRef.current = null
       renderCaptcha()
     })
@@ -54,7 +93,12 @@ export default function useRecaptcha(siteKey, themeSource = () => (document.docu
   }, [renderCaptcha])
 
   const getToken = () => window.grecaptcha?.getResponse(widgetIdRef.current) || ''
-  const reset = () => { try { if (widgetIdRef.current !== null) window.grecaptcha.reset(widgetIdRef.current) } catch (err) { console.warn('reCAPTCHA reset error', err) } }
+  const reset = () => {
+    try {
+      if (widgetIdRef.current !== null) window.grecaptcha.reset(widgetIdRef.current)
+      renderCaptcha()
+    } catch (err) { debug('Reset manual error', err) }
+  }
 
   return { containerRef, ready, getToken, reset, rerender: renderCaptcha }
 }
