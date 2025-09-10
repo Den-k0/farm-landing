@@ -29,6 +29,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setStatus({ type: null, msg: '' })
+    // Повертаємо старий спосіб отримання токена
     const token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
     if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
@@ -371,7 +372,7 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* reCAPTCHA widget */}
+                {/* reCAPTCHA widget (спрощений, як було) */}
                 <div className="g-recaptcha" data-sitekey={recaptchaSiteKey || 'missing_site_key'} />
                 {!recaptchaSiteKey && (
                   <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
