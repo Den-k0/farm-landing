@@ -25,6 +25,8 @@
         } catch {}
       })()
     </script>
+    <!-- Додано скрипт reCAPTCHA -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
   </head>
   <body>
     <!-- Hidden Netlify registration form -->
@@ -35,6 +37,8 @@
       <input type="email" name="email" />
       <textarea name="message"></textarea>
       <input name="bot-field" />
+      <!-- Додано поле для reCAPTCHA -->
+      <input type="hidden" name="g-recaptcha-response" />
     </form>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
