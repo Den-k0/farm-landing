@@ -49,18 +49,23 @@ function App() {
   useEffect(() => {
     if (!window.grecaptcha || !captchaRef.current) return
     if (captchaIdRef.current === null) return
-    // mark not ready
     setCaptchaReady(false)
-    // Remove old container completely instead of innerHTML clear
     const oldNode = captchaRef.current
     const parent = oldNode.parentNode
     if (!parent) return
     parent.removeChild(oldNode)
     const newNode = document.createElement('div')
+    newNode.id = 'recaptcha-container'
+    newNode.className = 'pt-1'
     captchaRef.current = newNode
-    parent.appendChild(newNode)
+    // Always place before submit button to keep consistent ordering
+    const submitBtn = parent.querySelector('button[type="submit"]')
+    if (submitBtn) {
+      parent.insertBefore(newNode, submitBtn)
+    } else {
+      parent.appendChild(newNode)
+    }
     captchaIdRef.current = null
-    // Defer re-render slightly to allow DOM paint & avoid race
     setTimeout(() => {
       if (window.grecaptcha && window.grecaptcha.render) {
         renderCaptcha()
@@ -88,6 +93,8 @@ function App() {
       setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
       return
     }
+    const hiddenToken = document.getElementById('g-recaptcha-response')
+    if (hiddenToken) hiddenToken.value = token
     setSubmitting(true)
     setStatus({ type: 'info', msg: 'Надсилання…' })
     pendingSubmitRef.current = true
@@ -362,6 +369,7 @@ function App() {
               <form
                 name="contact"
                 data-netlify="true"
+                data-netlify-recaptcha="true"
                 netlify-honeypot="bot-field"
                 onSubmit={handleSubmit}
                 action="/"
@@ -370,6 +378,7 @@ function App() {
                 className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur p-6 space-y-4"
               >
                 <input type="hidden" name="form-name" value="contact" />
+                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response" />
                 <p className="hidden">
                   <label>
                     Не заповнюйте це поле:{' '}
