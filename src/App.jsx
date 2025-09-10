@@ -386,6 +386,7 @@ function App() {
                     {status.msg}
                   </div>
                 )}
+                <div data-netlify-recaptcha="true" />
                 <button
                   disabled={submitting}
                   className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
