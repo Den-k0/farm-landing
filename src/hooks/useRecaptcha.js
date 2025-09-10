@@ -10,6 +10,7 @@ export default function useRecaptcha(siteKey, themeSource = () => (document.docu
   const renderVersionRef = useRef(0)
   const attemptRef = useRef(0)
   const readyRef = useRef(false)
+  const lastThemeRef = useRef(null)
   const [ready, setReady] = useState(false)
 
   const setReadySafe = (v) => { readyRef.current = v; setReady(v) }
@@ -21,6 +22,9 @@ export default function useRecaptcha(siteKey, themeSource = () => (document.docu
     if (!window.grecaptcha) { debug('Abort: grecaptcha not ready'); return }
     if (!containerRef.current) { debug('Abort: container missing'); return }
 
+    const currentTheme = themeSource()
+    lastThemeRef.current = currentTheme
+
     setReadySafe(false)
     while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild)
     const inner = document.createElement('div')
@@ -28,11 +32,11 @@ export default function useRecaptcha(siteKey, themeSource = () => (document.docu
     containerRef.current.appendChild(inner)
     const currentVersion = ++renderVersionRef.current
     const attempt = ++attemptRef.current
-    debug('Render attempt', { attempt, version: currentVersion, theme: themeSource() })
+    debug('Render attempt', { attempt, version: currentVersion, theme: currentTheme })
     try {
       widgetIdRef.current = window.grecaptcha.render(inner, {
         sitekey: siteKey,
-        theme: themeSource(),
+        theme: currentTheme,
         callback: () => { debug('Solved callback') },
         'error-callback': () => { debug('Error callback'); setReadySafe(false) },
         'expired-callback': () => { debug('Expired callback'); setReadySafe(false) }
@@ -63,13 +67,16 @@ export default function useRecaptcha(siteKey, themeSource = () => (document.docu
     const html = document.documentElement
     const obs = new MutationObserver(() => {
       if (!loadedRef.current || !window.grecaptcha) return
+      const newTheme = themeSource()
+      if (newTheme === lastThemeRef.current) return // prevent unnecessary re-render
       try { if (widgetIdRef.current !== null) window.grecaptcha.reset(widgetIdRef.current) } catch (err) { debug('Reset error', err) }
       widgetIdRef.current = null
+      debug('Theme change detected; re-rendering', { newTheme, prev: lastThemeRef.current })
       renderCaptcha()
     })
     obs.observe(html, { attributes: true, attributeFilter: ['class'] })
     return () => obs.disconnect()
-  }, [renderCaptcha])
+  }, [renderCaptcha, themeSource])
 
   const getToken = () => window.grecaptcha?.getResponse(widgetIdRef.current) || ''
   const reset = () => { try { if (widgetIdRef.current !== null) window.grecaptcha.reset(widgetIdRef.current); renderCaptcha() } catch (err) { debug('Reset manual error', err) } }
