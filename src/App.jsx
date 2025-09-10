@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 
 import logo from './assets/logo.svg'
 import useTheme from './hooks/useTheme'
@@ -16,33 +16,7 @@ function App() {
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
-  const recaptchaRef = useRef(null)
-  const [recaptchaWidgetId, setRecaptchaWidgetId] = useState(null)
 
-  useEffect(() => {
-    if (!recaptchaSiteKey) return
-    let cancelled = false
-    const tryRender = () => {
-      if (cancelled) return
-      if (window.grecaptcha?.render && recaptchaRef.current && recaptchaWidgetId === null) {
-        try {
-          const id = window.grecaptcha.render(recaptchaRef.current, { sitekey: recaptchaSiteKey })
-            setRecaptchaWidgetId(id)
-        } catch {}
-      } else if (recaptchaWidgetId === null) {
-        setTimeout(tryRender, 300)
-      }
-    }
-    tryRender()
-    return () => { cancelled = true }
-  }, [recaptchaSiteKey, recaptchaWidgetId])
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormState((s) => ({ ...s, [name]: value }))
-  }
-
-  // (B) Без кастомного fetch — нативне надсилання
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (submitting) return
@@ -57,18 +31,11 @@ function App() {
       return
     }
 
+    // Netlify сам вставить textarea[name="g-recaptcha-response"] після успішної перевірки
     let token = ''
-    try {
-      if (recaptchaWidgetId !== null && window.grecaptcha?.getResponse) {
-        token = window.grecaptcha.getResponse(recaptchaWidgetId) || ''
-      } else {
-        const ta = document.querySelector('textarea[name="g-recaptcha-response"]')
-        if (ta) token = ta.value || ''
-      }
-    } catch (err) {
-      console.warn('reCAPTCHA getResponse error', err)
-    }
-    if (recaptchaSiteKey && token.length < 20) { // більшість валідних токенів > 500 символів
+    const ta = document.querySelector('textarea[name="g-recaptcha-response"]')
+    if (ta) token = ta.value.trim()
+    if (recaptchaSiteKey && token.length < 20) { // користувач не пройшов reCAPTCHA
       setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
       return
     }
@@ -85,34 +52,12 @@ function App() {
         'bot-field': ''
       }
       if (token) data['g-recaptcha-response'] = token
-
-      const body = Object.entries(data)
-        .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
-        .join('&')
-
-      console.log('[FORM] submit body=', body)
-
-      const res = await fetch('/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body
-      })
-      const text = await res.text()
-      console.log('[FORM] status', res.status, 'len', text.length)
-      if (!res.ok) {
-        console.log('[FORM] response snippet:', text.slice(0, 300))
-        throw new Error('Submit failed ' + res.status)
-      }
-      // Евристика: чи Netlify віддав HTML сторінки (очікувано) — шукаємо <html
-      if (!/<!doctype/i.test(text) && !/<html/i.test(text)) {
-        console.warn('[FORM] unexpected response (не HTML?) snippet:', text.slice(0,120))
-      }
+      const body = new URLSearchParams(data).toString()
+      const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
+      if (!res.ok) throw new Error('Submit failed ' + res.status)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      // reset повільніше щоб Netlify встиг зчитати textarea (перестраховка)
-      setTimeout(() => { try { if (recaptchaWidgetId !== null && window.grecaptcha?.reset) window.grecaptcha.reset(recaptchaWidgetId) } catch {} }, 800)
     } catch (err) {
-      console.error('[FORM] error', err)
       setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
     } finally {
       setSubmitting(false)
@@ -431,12 +376,8 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {recaptchaSiteKey && (
-                  <div ref={recaptchaRef} className="g-recaptcha" />
-                )}
-                {!recaptchaSiteKey && (
-                  <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY.</div>
-                )}
+                {/* Офіційний placeholder reCAPTCHA. Netlify додає скрипт і textarea */}
+                <div data-netlify-recaptcha="true"></div>
                 {status.type && (
                   <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
                 )}
