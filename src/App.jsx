@@ -17,26 +17,6 @@ function App() {
   const [submitting, setSubmitting] = useState(false)
   const iframeRef = useRef(null)
   const pendingSubmitRef = useRef(false)
-  const recaptchaRef = useRef(null)
-  const recaptchaWidgetIdRef = useRef(null)
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY || '6LdnkKEqAAAAAPvyqoRAmjXxvE6evlb5z-5Ol90Y'
-
-  useEffect(() => {
-    let cancelled = false
-    const tryRender = () => {
-      if (cancelled) return
-      if (recaptchaRef.current && window.grecaptcha && window.grecaptcha.render && recaptchaWidgetIdRef.current == null) {
-        try {
-          const id = window.grecaptcha.render(recaptchaRef.current, { sitekey: siteKey })
-          recaptchaWidgetIdRef.current = id
-        } catch {}
-      } else if (recaptchaWidgetIdRef.current == null) {
-        setTimeout(tryRender, 300)
-      }
-    }
-    tryRender()
-    return () => { cancelled = true }
-  }, [siteKey])
 
   const handleSubmit = (e) => {
     if (submitting) { e.preventDefault(); return }
@@ -50,14 +30,6 @@ function App() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       e.preventDefault()
       setStatus({ type: 'error', msg: 'Некоректний email.' })
-      return
-    }
-    // reCAPTCHA token
-    let token = ''
-    try { if (window.grecaptcha?.getResponse && recaptchaWidgetIdRef.current != null) token = window.grecaptcha.getResponse(recaptchaWidgetIdRef.current) || '' } catch {}
-    if (siteKey && token.length < 20) {
-      e.preventDefault()
-      setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
       return
     }
     setSubmitting(true)
@@ -74,8 +46,6 @@ function App() {
       setSubmitting(false)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      // reset reCAPTCHA
-      try { if (window.grecaptcha?.reset && recaptchaWidgetIdRef.current != null) window.grecaptcha.reset(recaptchaWidgetIdRef.current) } catch {}
     }
     pendingSubmitRef.current = false
     iframe.addEventListener('load', onLoad)
@@ -395,12 +365,13 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div ref={recaptchaRef} className="g-recaptcha" />
+                <div data-netlify-recaptcha="true" className="mt-2" />
                 {status.type && (
-                  <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
+                  <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
                 )}
                 <button
                   disabled={submitting}
+                  aria-disabled={submitting}
                   className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
                 >
                   {submitting ? 'Надсилання…' : 'Надіслати'}
