@@ -1,11 +1,11 @@
-/** Encode object to x-www-form-urlencoded string */
+// encode: object -> application/x-www-form-urlencoded string
 export function encode(data) {
   return Object.keys(data)
     .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(data[k]))
     .join('&')
 }
 
-/** Validate contact form fields. Returns error message or null */
+// validateContact: returns localized error string or null
 export function validateContact({ firstName, email, message }) {
   if (!firstName.trim() || !email.trim() || !message.trim()) {
     return 'Заповніть обовʼязкові поля.'
