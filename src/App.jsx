@@ -6,6 +6,9 @@ import { kpis } from './data/stats'
 import { contacts as contactsData } from './data/contacts'
 import Header from './components/Header'
 
+// Use Netlify env vars: SITE_RECAPTCHA_KEY (public) & SITE_RECAPTCHA_SECRET (server-side only, NOT exposed here)
+const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme, setTheme, userPreferred, setUserPreferred } = useTheme()
@@ -19,9 +22,13 @@ function App() {
 
   const renderCaptcha = () => {
     if (!window.grecaptcha || !captchaRef.current) return
+    if (!RECAPTCHA_SITE_KEY) {
+      console.warn('Missing SITE_RECAPTCHA_KEY environment variable (public site key)')
+      return
+    }
     try {
       captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
-        sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+        sitekey: RECAPTCHA_SITE_KEY,
         theme: theme === 'dark' ? 'dark' : 'light',
         callback: () => {},
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
