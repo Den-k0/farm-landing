@@ -34,7 +34,6 @@ function App() {
       token = window.grecaptcha.getResponse() || ''
     }
     if (!token) {
-      // Fallback: textarea injected by reCAPTCHA
       token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
     }
 
@@ -58,12 +57,15 @@ function App() {
       const body = encode(bodyData)
       const res = await fetch('/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // мінімальний набір
         body,
+        redirect: 'follow',
       })
-      const text = await res.text()
-      if (import.meta.env.DEV) console.log('[Form debug] status', res.status, text.slice(0,150), 'tokenLen', token.length)
-      if (!res.ok) throw new Error(text || 'Failed')
+      const statusCode = res.status
+      const textSnippet = (await res.text()).slice(0, 160)
+      if (import.meta.env.DEV) console.log('[Form debug] raw status', statusCode, 'tokenLen', token.length, 'snippet:', textSnippet)
+      const successStatuses = [200, 201, 202, 204, 303]
+      if (!successStatuses.includes(statusCode)) throw new Error('Unexpected status ' + statusCode)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
       if (window.grecaptcha?.reset) {
