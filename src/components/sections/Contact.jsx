@@ -1,16 +1,76 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { contacts as contactsData } from '../../data/contacts'
-import useRecaptcha from '../../hooks/useRecaptcha'
+import useTheme from '../../hooks/useTheme'
 import { encode, validateContact } from '../../utils/form'
 
 const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
 
 export default function Contact() {
+  const { theme } = useTheme()
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
-  const { containerRef, ready, getToken, reset } = useRecaptcha(RECAPTCHA_SITE_KEY)
   const [lastSubmitTime, setLastSubmitTime] = useState(0)
+
+  // Manual reCAPTCHA management (old model)
+  const captchaRef = useRef(null)
+  const captchaIdRef = useRef(null)
+  const recaptchaLoadedRef = useRef(false)
+  const renderVersionRef = useRef(0)
+  const [captchaReady, setCaptchaReady] = useState(false)
+
+  const performRender = () => {
+    if (!window.grecaptcha || !captchaRef.current) return
+    if (!RECAPTCHA_SITE_KEY) { console.warn('Missing SITE_RECAPTCHA_KEY'); return }
+    setCaptchaReady(false)
+    while (captchaRef.current.firstChild) captchaRef.current.removeChild(captchaRef.current.firstChild)
+    const inner = document.createElement('div')
+    captchaRef.current.appendChild(inner)
+    const currentVersion = ++renderVersionRef.current
+    try {
+      captchaIdRef.current = window.grecaptcha.render(inner, {
+        sitekey: RECAPTCHA_SITE_KEY,
+        theme: theme === 'dark' ? 'dark' : 'light',
+        callback: () => {},
+        'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
+        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
+      })
+      setTimeout(() => { if (renderVersionRef.current === currentVersion) setCaptchaReady(true) }, 60)
+    } catch (e) {
+      console.warn('reCAPTCHA render error', e)
+      setTimeout(() => { if (renderVersionRef.current === currentVersion && !captchaReady) performRender() }, 400)
+    }
+  }
+
+  const initialRender = () => {
+    if (!window.grecaptcha || !captchaRef.current || captchaIdRef.current !== null) return
+    performRender()
+  }
+
+  // Load handling (keeps existing index.html script but layers our callback)
+  useEffect(() => {
+    const prev = window.onRecaptchaLoad
+    window.onRecaptchaLoad = () => {
+      if (typeof prev === 'function') { try { prev() } catch {} }
+      recaptchaLoadedRef.current = true
+      initialRender()
+    }
+    if (window.grecaptcha && window.grecaptcha.render) {
+      recaptchaLoadedRef.current = true
+      initialRender()
+    }
+  }, [])
+
+  // Theme change re-render
+  useEffect(() => {
+    if (!recaptchaLoadedRef.current) return
+    if (!window.grecaptcha) return
+    if (captchaIdRef.current !== null) {
+      try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
+      captchaIdRef.current = null
+    }
+    performRender()
+  }, [theme])
 
   const onChange = (field) => (e) => setFormState(s => ({ ...s, [field]: e.target.value }))
 
@@ -21,7 +81,7 @@ export default function Contact() {
     setStatus({ type: null, msg: '' })
     const validationError = validateContact(formState)
     if (validationError) { setStatus({ type: 'error', msg: validationError }); return }
-    const token = getToken()
+    const token = window.grecaptcha?.getResponse(captchaIdRef.current)
     if (!token) { setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' }); return }
     setSubmitting(true)
     setStatus({ type: 'info', msg: 'Надсилання…' })
@@ -31,7 +91,7 @@ export default function Contact() {
       if (response.ok) {
         setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
         setFormState({ firstName: '', lastName: '', email: '', message: '' })
-        reset()
+        if (window.grecaptcha && captchaIdRef.current !== null) { try { window.grecaptcha.reset(captchaIdRef.current) } catch {} }
         setLastSubmitTime(Date.now())
       } else throw new Error('Network error')
     } catch {
@@ -79,9 +139,11 @@ export default function Contact() {
             </div>
             <input className="w-full rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400" placeholder="Email *" name="email" type="email" value={formState.email} onChange={onChange('email')} required />
             <textarea rows={4} className="w-full rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400" placeholder="Повідомлення *" name="message" value={formState.message} onChange={onChange('message')} required maxLength={2000} />
-            <div ref={containerRef} id="recaptcha-container" className="min-h-[78px] pt-1" aria-label="reCAPTCHA" />
+            <div ref={captchaRef} id="recaptcha-container" className="min-h-[78px] pt-1" aria-label="reCAPTCHA" />
             {status.type && <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>}
-            <button disabled={submitting || !ready} className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition">{submitting ? 'Надсилання…' : 'Надіслати'}</button>
+            <button disabled={submitting || !captchaReady} className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition">
+              {submitting ? 'Надсилання…' : 'Надіслати'}
+            </button>
           </form>
         </div>
       </div>

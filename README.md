@@ -16,7 +16,7 @@ Single-page marketing site for the Ukrainian farm enterprise "ФГ «Калин�
 - Light/Dark theme with system preference sync + manual override
 - Accessible navigation (aria labels, focus-visible outlines, semantic landmarks)
 - Netlify form submission (honeypot + reCAPTCHA token) via progressive enhancement
-- Encapsulated reCAPTCHA logic hook with theme-aware re-render
+- Inline reCAPTCHA explicit render with theme-aware re-render in Contact section
 - Background gradient + grid visual layer isolated in Layout
 
 ## Project Structure
@@ -49,8 +49,7 @@ root
 │  │     ├─ Gallery.jsx      # Image gallery grid (static sources)
 │  │     └─ Contact.jsx      # Contact info + Netlify form + reCAPTCHA
 │  ├─ hooks/
-│  │  ├─ useTheme.js         # Theme state (persist & system sync)
-│  │  └─ useRecaptcha.js     # Encapsulated reCAPTCHA lifecycle
+│  │  └─ useTheme.js         # Theme state (persist & system sync)
 │  ├─ data/
 │  │  ├─ stats.js            # KPI statistics for hero
 │  │  ├─ gallery.js          # Gallery image source list
@@ -69,7 +68,7 @@ Set in Netlify UI or local `.env` (never commit secrets):
 ## reCAPTCHA Integration
 1. `index.html` loads the Google script with `onload=onRecaptchaLoad&render=explicit`.
 2. Hidden Netlify form registers fields for build parsing.
-3. `useRecaptcha` hook performs explicit render into a ref container, tracks readiness and re-renders when theme changes.
+3. Contact component explicitly renders reCAPTCHA into a ref container; on theme change it resets and re-renders with updated theme.
 4. Contact form fetch-posts URL-encoded body including `g-recaptcha-response` token.
 
 ## Form Handling
@@ -114,7 +113,7 @@ npm run format
 - Lazy loading heavy sections (Gallery) with `React.lazy`
 - Structured data (JSON-LD) for Organization
 - Central Card / Section UI primitives
-- Unit tests for hooks (if expanded)
+- Unit tests for recaptcha render + form utils
 
 ## Deployment
 - Deployed to Netlify; form + reCAPTCHA handled automatically server-side.
