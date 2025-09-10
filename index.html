@@ -29,13 +29,14 @@
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
   </head>
   <body>
-    <!-- Hidden Netlify form for build-time detection (without reCAPTCHA placeholder to avoid consuming widget) -->
+    <!-- Hidden Netlify form for build-time detection with reCAPTCHA placeholder -->
     <form name="contact" data-netlify="true" netlify-honeypot="bot-field" hidden>
       <input type="text" name="firstName" />
       <input type="text" name="lastName" />
       <input type="email" name="email" />
       <textarea name="message"></textarea>
       <input name="bot-field" />
+      <div data-netlify-recaptcha="true"></div>
     </form>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
