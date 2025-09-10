@@ -40,37 +40,36 @@ function App() {
 
   useEffect(() => {
     window.onRecaptchaLoad = () => {
+      // Рендеримо один раз при завантаженні скрипта
+      if (captchaIdRef.current === null) renderCaptcha()
+    }
+    if (window.grecaptcha && window.grecaptcha.render && captchaIdRef.current === null) {
       renderCaptcha()
     }
-    if (window.grecaptcha && window.grecaptcha.render) {
-      renderCaptcha()
+    return () => {
+      // при демонтажі очищаємо callback
+      delete window.onRecaptchaLoad
     }
   }, [])
 
+  // Спрощена логіка: не пересоздаємо DOM-вузол, а повністю перерендеримо капчу в тому ж контейнері
   useEffect(() => {
     if (!window.grecaptcha || !captchaRef.current) return
-    if (captchaIdRef.current === null) return
+    if (!RECAPTCHA_SITE_KEY) return
+    // Повне пересоздання (v2 не підтримує live зміну теми)
     setCaptchaReady(false)
-    const oldNode = captchaRef.current
-    const parent = oldNode.parentNode
-    if (!parent) return
-    parent.removeChild(oldNode)
-    const newNode = document.createElement('div')
-    newNode.id = 'recaptcha-container'
-    newNode.className = 'pt-1'
-    captchaRef.current = newNode
-    const submitBtn = parent.querySelector('button[type="submit"]')
-    if (submitBtn) {
-      parent.insertBefore(newNode, submitBtn)
-    } else {
-      parent.appendChild(newNode)
-    }
+    captchaRef.current.innerHTML = ''
     captchaIdRef.current = null
-    setTimeout(() => {
-      if (window.grecaptcha && window.grecaptcha.render) {
-        renderCaptcha()
-      }
-    }, 60)
+    try {
+      captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
+        sitekey: RECAPTCHA_SITE_KEY,
+        theme: theme === 'dark' ? 'dark' : 'light',
+        callback: () => {},
+        'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
+        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
+      })
+      setCaptchaReady(true)
+    } catch {}
   }, [theme])
 
   const encode = (data) => {
@@ -397,10 +396,10 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div ref={captchaRef} id="recaptcha-container" className="pt-1" aria-label="reCAPTCHA" />
-                {status.type && (
-                  <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
-                )}
+                <div className="space-y-2">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Захист reCAPTCHA</div>
+                  <div ref={captchaRef} id="recaptcha-container" className="pt-1" aria-label="reCAPTCHA" />
+                </div>
                 <button
                   disabled={submitting || !captchaReady}
                   aria-disabled={submitting || !captchaReady}
@@ -408,6 +407,9 @@ function App() {
                 >
                   {submitting ? 'Надсилання…' : 'Надіслати'}
                 </button>
+                {status.type && (
+                  <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
+                )}
               </form>
             </div>
           </div>
