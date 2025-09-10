@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 
 import logo from './assets/logo.svg'
 import useTheme from './hooks/useTheme'
@@ -11,15 +11,11 @@ import Header from './components/Header'
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme, setTheme, userPreferred, setUserPreferred } = useTheme()
-
   const livestockImage = '/photo_pigs.jpeg'
-
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
-  const recaptchaRef = useRef(null)
-  const recaptchaWidgetId = useRef(null)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -31,14 +27,17 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setStatus({ type: null, msg: '' })
+
+    // Acquire reCAPTCHA token (auto-rendered widget)
     let token = ''
-    if (recaptchaWidgetId.current != null && window.grecaptcha?.getResponse) {
-      token = window.grecaptcha.getResponse(recaptchaWidgetId.current) || ''
-    } else if (window.grecaptcha?.getResponse) {
+    if (window.grecaptcha?.getResponse) {
       token = window.grecaptcha.getResponse() || ''
-    } else {
+    }
+    if (!token) {
+      // Fallback: textarea injected by reCAPTCHA
       token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
     }
+
     if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
       return
@@ -51,6 +50,7 @@ function App() {
       setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
       return
     }
+
     setSubmitting(true)
     try {
       const bodyData = { 'form-name': 'contact', ...formState, 'bot-field': '' }
@@ -62,12 +62,12 @@ function App() {
         body,
       })
       const text = await res.text()
-      if (import.meta.env.DEV) console.log('[Form debug] status', res.status, text.slice(0,150))
+      if (import.meta.env.DEV) console.log('[Form debug] status', res.status, text.slice(0,150), 'tokenLen', token.length)
       if (!res.ok) throw new Error(text || 'Failed')
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      if (window.grecaptcha?.reset && recaptchaWidgetId.current != null) {
-        try { window.grecaptcha.reset(recaptchaWidgetId.current) } catch {}
+      if (window.grecaptcha?.reset) {
+        try { window.grecaptcha.reset() } catch {}
       }
     } catch (err) {
       if (import.meta.env.DEV) console.error('[Form debug] submit error', err)
@@ -126,29 +126,6 @@ function App() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
-
-  useEffect(() => {
-    if (!recaptchaSiteKey) return
-    let attempts = 0
-    const maxAttempts = 40
-    const tryRender = () => {
-      if (recaptchaWidgetId.current != null) return
-      if (window.grecaptcha?.render && recaptchaRef.current) {
-        try {
-          recaptchaWidgetId.current = window.grecaptcha.render(recaptchaRef.current, {
-            sitekey: recaptchaSiteKey,
-            theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-          })
-          if (import.meta.env.DEV) console.log('[reCAPTCHA] rendered widgetId', recaptchaWidgetId.current)
-        } catch (e) {
-          if (import.meta.env.DEV) console.warn('[reCAPTCHA] render error', e)
-        }
-      } else if (attempts++ < maxAttempts) {
-        setTimeout(tryRender, 300)
-      }
-    }
-    tryRender()
-  }, [recaptchaSiteKey, theme])
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 selection:bg-emerald-400/30 selection:text-emerald-100 font-sans">
@@ -410,13 +387,15 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* reCAPTCHA: авто-рендер Google */}
-                <div ref={recaptchaRef} className="mt-1" />
+                {/* Auto-render reCAPTCHA widget */}
+                {recaptchaSiteKey && (
+                  <div className="g-recaptcha" data-sitekey={recaptchaSiteKey}></div>
+                )}
                 {!recaptchaSiteKey && (
                   <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
                 )}
                 {status.type && (
-                  <div className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
+                  <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
                 )}
                 <button
                   disabled={submitting}
