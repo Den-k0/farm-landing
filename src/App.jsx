@@ -14,6 +14,10 @@ function App() {
 
   const livestockImage = '/photo_pigs.jpeg'
 
+  const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
+  const [status, setStatus] = useState({ type: null, msg: '' })
+  const [submitting, setSubmitting] = useState(false)
+
   useEffect(() => {
     const root = document.documentElement
     const body = document.body
@@ -63,6 +67,53 @@ function App() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormState((s) => ({ ...s, [name]: value }))
+  }
+
+  const encode = (data) => {
+    return Object.keys(data)
+      .map((key) => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
+      .join('&')
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const form = e.target
+    // Honeypot
+    if (form['bot-field'].value) {
+      setStatus({ type: 'error', msg: 'Відхилено (підозра на спам).' })
+      return
+    }
+    // Simple validation
+    if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
+      setStatus({ type: 'error', msg: 'Будь ласка, заповніть обовʼязкові поля.' })
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
+      setStatus({ type: 'error', msg: 'Некоректний email.' })
+      return
+    }
+    setSubmitting(true)
+    setStatus({ type: null, msg: '' })
+    try {
+      const body = encode({ 'form-name': 'contact', ...formState, 'bot-field': '' })
+      const res = await fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      })
+      if (!res.ok) throw new Error('Network response not ok')
+      setStatus({ type: 'success', msg: 'Повідомлення надіслано! Дякуємо.' })
+      setFormState({ firstName: '', lastName: '', email: '', message: '' })
+    } catch (err) {
+      setStatus({ type: 'error', msg: 'Сталася помилка. Спробуйте пізніше.' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 selection:bg-emerald-400/30 selection:text-emerald-100 font-sans">
@@ -272,16 +323,75 @@ function App() {
               </div>
 
               {/* Right column: form card with heading inside */}
-              <form className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur p-6 space-y-4">
+              <form
+                name="contact"
+                data-netlify="true"
+                netlify-honeypot="bot-field"
+                onSubmit={handleSubmit}
+                className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur p-6 space-y-4"
+              >
+                <input type="hidden" name="form-name" value="contact" />
+                <p className="hidden">
+                  <label>
+                    Не заповнюйте це поле:{' '}
+                    <input name="bot-field" onChange={() => {}} />
+                  </label>
+                </p>
                 <h3 className="text-xl font-semibold">Напишіть нам</h3>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Залиште свої контакти та повідомлення — ми відповімо.</p>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <input className="rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400" placeholder="Імʼя" />
-                  <input className="rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400" placeholder="Прізвище" />
+                  <input
+                    className="rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400"
+                    placeholder="Імʼя *"
+                    name="firstName"
+                    value={formState.firstName}
+                    onChange={handleChange}
+                    required
+                  />
+                  <input
+                    className="rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400"
+                    placeholder="Прізвище"
+                    name="lastName"
+                    value={formState.lastName}
+                    onChange={handleChange}
+                  />
                 </div>
-                <input className="w-full rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400" placeholder="Email" />
-                <textarea rows={4} className="w-full rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400" placeholder="Повідомлення" />
-                <button className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition">Надіслати</button>
+                <input
+                  className="w-full rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400"
+                  placeholder="Email *"
+                  name="email"
+                  type="email"
+                  value={formState.email}
+                  onChange={handleChange}
+                  required
+                />
+                <textarea
+                  rows={4}
+                  className="w-full rounded-lg bg-white border border-black/5 dark:bg-white/5 dark:border-white/10 px-4 py-3 outline-none placeholder:text-neutral-400"
+                  placeholder="Повідомлення *"
+                  name="message"
+                  value={formState.message}
+                  onChange={handleChange}
+                  required
+                  maxLength={2000}
+                />
+                {status.type && (
+                  <div
+                    className={`text-sm font-medium ${
+                      status.type === 'success'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}
+                  >
+                    {status.msg}
+                  </div>
+                )}
+                <button
+                  disabled={submitting}
+                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
+                >
+                  {submitting ? 'Надсилання…' : 'Надіслати'}
+                </button>
               </form>
             </div>
           </div>
