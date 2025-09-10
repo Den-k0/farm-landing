@@ -25,8 +25,8 @@
         } catch {}
       })()
     </script>
-    <!-- Netlify reCAPTCHA placeholder у формі: <div data-netlify-recaptcha="true"></div> -->
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <!-- Manual explicit reCAPTCHA (повернено) -->
+    <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
   </head>
   <body>
     <!-- Hidden Netlify registration form (без reCAPTCHA placeholder) -->

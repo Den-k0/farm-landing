@@ -18,6 +18,31 @@ function App() {
   const iframeRef = useRef(null)
   const pendingSubmitRef = useRef(false)
 
+  // Manual reCAPTCHA
+  const recaptchaRef = useRef(null)
+  const recaptchaWidgetIdRef = useRef(null)
+  const [captchaReady, setCaptchaReady] = useState(false)
+  const [captchaVerified, setCaptchaVerified] = useState(false)
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY || '6LdnkKEqAAAAAPvyqoRAmjXxvE6evlb5z-5Ol90Y'
+
+  useEffect(() => {
+    window.onRecaptchaLoad = () => {
+      if (!recaptchaRef.current || !window.grecaptcha || recaptchaWidgetIdRef.current != null) return
+      try {
+        recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaRef.current, {
+          sitekey: siteKey,
+          callback: () => setCaptchaVerified(true),
+          'expired-callback': () => setCaptchaVerified(false),
+          'error-callback': () => setCaptchaVerified(false),
+        })
+        setCaptchaReady(true)
+      } catch {}
+    }
+    if (window.grecaptcha?.render && recaptchaWidgetIdRef.current == null) {
+      window.onRecaptchaLoad()
+    }
+  }, [siteKey])
+
   const handleSubmit = (e) => {
     if (submitting) { e.preventDefault(); return }
     setStatus({ type: null, msg: '' })
@@ -30,6 +55,11 @@ function App() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       e.preventDefault()
       setStatus({ type: 'error', msg: 'Некоректний email.' })
+      return
+    }
+    if (!captchaVerified) {
+      e.preventDefault()
+      setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
       return
     }
     setSubmitting(true)
@@ -46,6 +76,12 @@ function App() {
       setSubmitting(false)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
+      try {
+        if (window.grecaptcha?.reset && recaptchaWidgetIdRef.current != null) {
+          window.grecaptcha.reset(recaptchaWidgetIdRef.current)
+          setCaptchaVerified(false)
+        }
+      } catch {}
     }
     pendingSubmitRef.current = false
     iframe.addEventListener('load', onLoad)
@@ -365,20 +401,21 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div data-netlify-recaptcha="true" className="mt-2" />
+                <div ref={recaptchaRef} className="mt-2">
+                  {!captchaReady && <div className="text-xs text-neutral-500 dark:text-neutral-500">Завантаження reCAPTCHA…</div>}
+                </div>
                 {status.type && (
                   <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
                 )}
                 <button
-                  disabled={submitting}
-                  aria-disabled={submitting}
+                  disabled={submitting || !captchaVerified}
+                  aria-disabled={submitting || !captchaVerified}
                   className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
                 >
-                  {submitting ? 'Надсилання…' : 'Надіслати'}
+                  {submitting ? 'Надсилання…' : !captchaVerified ? 'Підтвердіть reCAPTCHA' : 'Надіслати'}
                 </button>
                 <p className="text-xs text-neutral-500 dark:text-neutral-500">Захищено reCAPTCHA: Google Privacy Policy & Terms apply.</p>
               </form>
-              {/* Прихований iframe для уникнення редіректу */}
               <iframe name="netlify-frame" ref={iframeRef} hidden title="netlify-result" />
             </div>
           </div>
