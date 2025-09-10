@@ -19,48 +19,70 @@ function App() {
   const captchaRef = useRef(null)
   const captchaIdRef = useRef(null)
   const [captchaReady, setCaptchaReady] = useState(false)
+  const recaptchaLoadedRef = useRef(false)
+  const renderVersionRef = useRef(0)
 
-  // Одноразовий рендер без переміщення / перевставлення
-  const renderCaptcha = () => {
+  // Базовий одноразовий рендер (викликається після завантаження скрипта)
+  const initialRender = () => {
+    if (!window.grecaptcha || !captchaRef.current || captchaIdRef.current !== null) return
+    performRender()
+  }
+
+  const performRender = () => {
     if (!window.grecaptcha || !captchaRef.current) return
-    if (captchaIdRef.current !== null) return
     if (!RECAPTCHA_SITE_KEY) {
-      console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set in environment)')
+      console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set)')
       return
     }
+    setCaptchaReady(false)
+    // Очищаємо контейнер повністю (iframe старої капчі може залишатись, тому видаляємо дітей)
+    while (captchaRef.current.firstChild) captchaRef.current.removeChild(captchaRef.current.firstChild)
+    const inner = document.createElement('div')
+    captchaRef.current.appendChild(inner)
+    const currentVersion = ++renderVersionRef.current
     try {
-      captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
+      captchaIdRef.current = window.grecaptcha.render(inner, {
         sitekey: RECAPTCHA_SITE_KEY,
         theme: theme === 'dark' ? 'dark' : 'light',
         callback: () => {},
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
-        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
+        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
       })
-      setCaptchaReady(true)
-    } catch {}
+      // Невелика пауза щоб iframe вставився, тоді ставимо готовність
+      setTimeout(() => {
+        if (renderVersionRef.current === currentVersion) setCaptchaReady(true)
+      }, 50)
+    } catch (e) {
+      console.warn('reCAPTCHA render error', e)
+      // Повтор через 400 мс якщо ще актуальна версія і не готово
+      setTimeout(() => {
+        if (renderVersionRef.current === currentVersion && !captchaReady) performRender()
+      }, 400)
+    }
   }
 
+  // Завантаження скрипта -> перший рендер
   useEffect(() => {
     window.onRecaptchaLoad = () => {
-      renderCaptcha()
+      recaptchaLoadedRef.current = true
+      initialRender()
     }
     if (window.grecaptcha && window.grecaptcha.render) {
-      renderCaptcha()
+      recaptchaLoadedRef.current = true
+      initialRender()
     }
   }, [])
 
-  // Re-render reCAPTCHA when theme changes (Google widget does not support dynamic theme switch)
+  // Перебудова при зміні теми (Google не підтримує live switch, тому повна перебудова)
   useEffect(() => {
+    if (!recaptchaLoadedRef.current) return
     if (!window.grecaptcha) return
-    if (captchaIdRef.current === null) return // not rendered yet
-    // Reset and fully re-render with new theme
-    try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
-    captchaIdRef.current = null
-    setCaptchaReady(false)
-    if (captchaRef.current) {
-      captchaRef.current.innerHTML = ''
-      renderCaptcha()
+    // Скидаємо токен попередньої теми
+    if (captchaIdRef.current !== null) {
+      try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
+      captchaIdRef.current = null
     }
+    performRender()
   }, [theme])
 
   const encode = (data) => {
