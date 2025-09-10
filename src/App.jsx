@@ -20,12 +20,20 @@ function App() {
   const captchaIdRef = useRef(null)
   const [captchaReady, setCaptchaReady] = useState(false)
 
-  const renderCaptcha = () => {
-    if (!window.grecaptcha || !captchaRef.current) return
-    if (!RECAPTCHA_SITE_KEY) {
-      console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set in environment)')
+  // Мінімальна версія: одноразове створення віджета. Без перерендеру при зміні теми. Додаємо захист від дублювання.
+  const renderCaptchaOnce = () => {
+    if (!captchaRef.current) return
+    // Якщо віджет вже всередині (Google додає елемент з класом g-recaptcha)
+    if (captchaRef.current.querySelector('.g-recaptcha')) {
+      if (!captchaReady) setCaptchaReady(true)
       return
     }
+    if (captchaIdRef.current !== null) return
+    if (!RECAPTCHA_SITE_KEY) {
+      console.warn('[reCAPTCHA] Відсутній SITE_RECAPTCHA_KEY')
+      return
+    }
+    if (!window.grecaptcha || !window.grecaptcha.render) return
     try {
       captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
         sitekey: RECAPTCHA_SITE_KEY,
@@ -35,15 +43,17 @@ function App() {
         'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
       })
       setCaptchaReady(true)
-    } catch {}
+    } catch (e) {
+      console.error('[reCAPTCHA] Помилка рендеру', e)
+    }
   }
 
   useEffect(() => {
     window.onRecaptchaLoad = () => {
-      renderCaptcha()
+      renderCaptchaOnce()
     }
     if (window.grecaptcha && window.grecaptcha.render) {
-      renderCaptcha()
+      renderCaptchaOnce()
     }
   }, [])
 
@@ -68,7 +78,7 @@ function App() {
     captchaIdRef.current = null
     setTimeout(() => {
       if (window.grecaptcha && window.grecaptcha.render) {
-        renderCaptcha()
+        renderCaptchaOnce()
       }
     }, 60)
   }, [theme])
@@ -397,10 +407,23 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div ref={captchaRef} id="recaptcha-container" className="pt-1" aria-label="reCAPTCHA" />
-                {status.type && (
-                  <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
-                )}
+                {/* reCAPTCHA БЛОК: НЕ РУХАТИ ЧЕРЕЗ JS. Повинен бути БЕЗПОСЕРЕДНЬО НАД кнопкою */}
+                <div className="recaptcha-wrapper">
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Захист reCAPTCHA</div>
+                  <div
+                    ref={captchaRef}
+                    id="recaptcha-container"
+                    className="min-h-[78px] flex items-center justify-start"
+                    aria-label="reCAPTCHA"
+                  >
+                    {!RECAPTCHA_SITE_KEY && (
+                      <div className="text-xs text-red-600 dark:text-red-400">Немає ключа SITE_RECAPTCHA_KEY</div>
+                    )}
+                    {RECAPTCHA_SITE_KEY && !captchaReady && (
+                      <div className="animate-pulse h-10 w-64 rounded bg-neutral-200 dark:bg-neutral-700" />
+                    )}
+                  </div>
+                </div>
                 <button
                   disabled={submitting || !captchaReady}
                   aria-disabled={submitting || !captchaReady}
@@ -408,6 +431,9 @@ function App() {
                 >
                   {submitting ? 'Надсилання…' : 'Надіслати'}
                 </button>
+                {status.type && (
+                  <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
+                )}
               </form>
             </div>
           </div>
