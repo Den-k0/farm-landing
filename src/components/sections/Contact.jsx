@@ -7,7 +7,7 @@ const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
 
 export default function Contact() {
   // --- FORM STATE ---
-  const { theme } = useTheme() // exact old pattern
+  const { theme } = useTheme() // keep for other UI, but reCAPTCHA rebuild will watch DOM class directly
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
@@ -19,28 +19,33 @@ export default function Contact() {
   const recaptchaLoadedRef = useRef(false)
   const renderVersionRef = useRef(0)
   const [captchaReady, setCaptchaReady] = useState(false)
+  const lastDomThemeRef = useRef(null)
 
-  // Old performRender identical semantics
+  const getDomTheme = () => (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+
   const performRender = () => {
     if (!window.grecaptcha || !captchaRef.current) return
     if (!RECAPTCHA_SITE_KEY) { console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set)'); return }
+    const domTheme = getDomTheme()
     setCaptchaReady(false)
     while (captchaRef.current.firstChild) captchaRef.current.removeChild(captchaRef.current.firstChild)
     const inner = document.createElement('div')
+    // give inner a unique id each time to avoid any internal caching quirks
+    inner.id = `recaptcha-inner-${Date.now()}-${Math.random().toString(36).slice(2)}`
     captchaRef.current.appendChild(inner)
     const currentVersion = ++renderVersionRef.current
-    console.debug('[reCAPTCHA] rendering version', currentVersion, 'theme=', theme)
+    console.debug('[reCAPTCHA] render v', currentVersion, 'theme=', domTheme)
     try {
       captchaIdRef.current = window.grecaptcha.render(inner, {
         sitekey: RECAPTCHA_SITE_KEY,
-        theme: theme === 'dark' ? 'dark' : 'light',
+        theme: domTheme,
         callback: () => {},
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
         'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
       })
-      setTimeout(() => { if (renderVersionRef.current === currentVersion) setCaptchaReady(true) }, 50)
+      setTimeout(() => { if (renderVersionRef.current === currentVersion) setCaptchaReady(true) }, 60)
     } catch (e) {
-      console.warn('reCAPTCHA render error', e)
+      console.warn('[reCAPTCHA] render error', e)
       setTimeout(() => { if (renderVersionRef.current === currentVersion && !captchaReady) performRender() }, 400)
     }
   }
@@ -58,29 +63,36 @@ export default function Contact() {
       recaptchaLoadedRef.current = true
       console.debug('[reCAPTCHA] script loaded')
       initialRender()
+      lastDomThemeRef.current = getDomTheme()
     }
     if (window.grecaptcha && window.grecaptcha.render) {
       recaptchaLoadedRef.current = true
       console.debug('[reCAPTCHA] script already present')
       initialRender()
+      lastDomThemeRef.current = getDomTheme()
     }
   }, [])
 
-  // Theme change => full rebuild (old behaviour) with slight delay to ensure reset fully applies.
+  // Observe actual DOM class changes to trigger re-render AFTER class switched.
   useEffect(() => {
-    if (!recaptchaLoadedRef.current) return
-    if (!window.grecaptcha) return
-    console.debug('[reCAPTCHA] theme change detected =>', theme)
-    if (captchaIdRef.current !== null) {
-      try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
-      captchaIdRef.current = null
-    }
-    // Small delay (next animation frame) avoids rare race where immediate re-render keeps old theme.
-    requestAnimationFrame(() => {
-      // Extra tiny timeout (0) to yield after frame paint in Safari.
-      setTimeout(() => performRender(), 0)
+    const html = document.documentElement
+    lastDomThemeRef.current = getDomTheme()
+    const observer = new MutationObserver(() => {
+      const currentDomTheme = getDomTheme()
+      if (currentDomTheme === lastDomThemeRef.current) return
+      lastDomThemeRef.current = currentDomTheme
+      if (!recaptchaLoadedRef.current || !window.grecaptcha) return
+      console.debug('[reCAPTCHA] detected DOM theme change =>', currentDomTheme, 'rebuilding widget')
+      if (captchaIdRef.current !== null) {
+        try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
+        captchaIdRef.current = null
+      }
+      // delay one frame to ensure previous iframe fully detached
+      requestAnimationFrame(() => setTimeout(() => performRender(), 0))
     })
-  }, [theme])
+    observer.observe(html, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   // --- FORM HANDLERS ---
   const onChange = (field) => (e) => setFormState(s => ({ ...s, [field]: e.target.value }))
