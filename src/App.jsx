@@ -20,15 +20,13 @@ function App() {
   const captchaIdRef = useRef(null)
   const [captchaReady, setCaptchaReady] = useState(false)
 
-  // Мінімальна версія: одноразове створення віджета. Без перерендеру при зміні теми. Додаємо захист від дублювання.
-  const renderCaptchaOnce = () => {
+  // Single render helper
+  const renderCaptchaInitial = () => {
     if (!captchaRef.current) return
-    // Якщо віджет вже всередині (Google додає елемент з класом g-recaptcha)
-    if (captchaRef.current.querySelector('.g-recaptcha')) {
+    if (captchaIdRef.current !== null) { // already rendered
       if (!captchaReady) setCaptchaReady(true)
       return
     }
-    if (captchaIdRef.current !== null) return
     if (!RECAPTCHA_SITE_KEY) {
       console.warn('[reCAPTCHA] Відсутній SITE_RECAPTCHA_KEY')
       return
@@ -50,37 +48,32 @@ function App() {
 
   useEffect(() => {
     window.onRecaptchaLoad = () => {
-      renderCaptchaOnce()
+      renderCaptchaInitial()
     }
     if (window.grecaptcha && window.grecaptcha.render) {
-      renderCaptchaOnce()
+      renderCaptchaInitial()
     }
   }, [])
 
+  // Re-render only inside the SAME container on theme change (stable placement)
   useEffect(() => {
     if (!window.grecaptcha || !captchaRef.current) return
-    if (captchaIdRef.current === null) return
-    setCaptchaReady(false)
-    const oldNode = captchaRef.current
-    const parent = oldNode.parentNode
-    if (!parent) return
-    parent.removeChild(oldNode)
-    const newNode = document.createElement('div')
-    newNode.id = 'recaptcha-container'
-    newNode.className = 'pt-1'
-    captchaRef.current = newNode
-    const submitBtn = parent.querySelector('button[type="submit"]')
-    if (submitBtn) {
-      parent.insertBefore(newNode, submitBtn)
-    } else {
-      parent.appendChild(newNode)
+    if (captchaIdRef.current === null) return // not rendered yet
+    // Re-render to change theme without moving DOM node
+    try {
+      setCaptchaReady(false)
+      captchaRef.current.innerHTML = ''
+      captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
+        sitekey: RECAPTCHA_SITE_KEY,
+        theme: theme === 'dark' ? 'dark' : 'light',
+        callback: () => {},
+        'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
+        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
+      })
+      setCaptchaReady(true)
+    } catch (e) {
+      console.error('[reCAPTCHA] Помилка повторного рендеру', e)
     }
-    captchaIdRef.current = null
-    setTimeout(() => {
-      if (window.grecaptcha && window.grecaptcha.render) {
-        renderCaptchaOnce()
-      }
-    }, 60)
   }, [theme])
 
   const encode = (data) => {
@@ -407,7 +400,7 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* reCAPTCHA БЛОК: НЕ РУХАТИ ЧЕРЕЗ JS. Повинен бути БЕЗПОСЕРЕДНЬО НАД кнопкою */}
+                {/* reCAPTCHA: static container (stable). Only re-render iframe in-place on theme change. */}
                 <div className="recaptcha-wrapper">
                   <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Захист reCAPTCHA</div>
                   <div
