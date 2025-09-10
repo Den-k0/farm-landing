@@ -6,7 +6,7 @@ import { kpis } from './data/stats'
 import { contacts as contactsData } from './data/contacts'
 import Header from './components/Header'
 
-// Use Netlify env vars: SITE_RECAPTCHA_KEY (public) & SITE_RECAPTCHA_SECRET (server-side only, NOT exposed here)
+// Use only SITE_RECAPTCHA_KEY as per documentation (injected via vite.config.js define)
 const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
 
 function App() {
@@ -23,7 +23,7 @@ function App() {
   const renderCaptcha = () => {
     if (!window.grecaptcha || !captchaRef.current) return
     if (!RECAPTCHA_SITE_KEY) {
-      console.warn('Missing SITE_RECAPTCHA_KEY environment variable (public site key)')
+      console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set in environment)')
       return
     }
     try {
