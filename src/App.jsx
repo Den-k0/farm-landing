@@ -17,6 +17,58 @@ function App() {
   const [submitting, setSubmitting] = useState(false)
   const iframeRef = useRef(null)
   const pendingSubmitRef = useRef(false)
+  const captchaRef = useRef(null)
+  const captchaIdRef = useRef(null)
+  const [captchaReady, setCaptchaReady] = useState(false)
+
+  const renderCaptcha = () => {
+    if (!window.grecaptcha || !captchaRef.current) return
+    try {
+      if (captchaIdRef.current !== null) {
+        // reset existing to apply theme changes
+        window.grecaptcha.reset(captchaIdRef.current)
+      } else {
+        captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
+          sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+          theme: theme === 'dark' ? 'dark' : 'light',
+          callback: () => {
+            // token received
+          },
+          'error-callback': () => {
+            setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' })
+          },
+          'expired-callback': () => {
+            setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
+          },
+        })
+      }
+      setCaptchaReady(true)
+    } catch (e) {
+      // swallow
+    }
+  }
+
+  useEffect(() => {
+    // global onload (declared before script loads in index.html query param)
+    window.onRecaptchaLoad = () => {
+      renderCaptcha()
+    }
+    // if script already loaded
+    if (window.grecaptcha && window.grecaptcha.render) {
+      renderCaptcha()
+    }
+  }, [])
+
+  // re-render captcha on theme change to update theme (must rebuild widget)
+  useEffect(() => {
+    if (!window.grecaptcha || captchaIdRef.current === null) return
+    // Remove existing iframe container by clearing innerHTML then re-render
+    const container = captchaRef.current
+    if (!container) return
+    container.innerHTML = ''
+    captchaIdRef.current = null
+    renderCaptcha()
+  }, [theme])
 
   const handleSubmit = (e) => {
     if (submitting) { e.preventDefault(); return }
@@ -30,6 +82,12 @@ function App() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       e.preventDefault()
       setStatus({ type: 'error', msg: 'Некоректний email.' })
+      return
+    }
+    const token = window.grecaptcha?.getResponse(captchaIdRef.current)
+    if (!token) {
+      e.preventDefault()
+      setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
       return
     }
     setSubmitting(true)
@@ -46,6 +104,9 @@ function App() {
       setSubmitting(false)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
+      if (window.grecaptcha && captchaIdRef.current !== null) {
+        window.grecaptcha.reset(captchaIdRef.current)
+      }
     }
     pendingSubmitRef.current = false
     iframe.addEventListener('load', onLoad)
@@ -355,12 +416,13 @@ function App() {
                   required
                   maxLength={2000}
                 />
+                <div ref={captchaRef} className="pt-1" aria-label="reCAPTCHA" />
                 {status.type && (
                   <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
                 )}
                 <button
-                  disabled={submitting}
-                  aria-disabled={submitting}
+                  disabled={submitting || !captchaReady}
+                  aria-disabled={submitting || !captchaReady}
                   className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
                 >
                   {submitting ? 'Надсилання…' : 'Надіслати'}

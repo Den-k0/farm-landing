@@ -25,8 +25,8 @@
         } catch {}
       })()
     </script>
-    <!-- Official reCAPTCHA script (Netlify will also inject if spam protection enabled) -->
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <!-- Updated reCAPTCHA script for explicit rendering with onload callback -->
+    <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>
   </head>
   <body>
     <!-- Hidden Netlify registration form (parsed at build). Includes reCAPTCHA placeholder so Netlify enables spam protection. -->
