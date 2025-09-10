@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 
+/**
+ * Theme hook: manages light/dark, persists user preference, reacts to system changes.
+ * Returns { theme, setTheme, userPreferred, setUserPreferred }.
+ */
 export default function useTheme() {
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark'
@@ -21,24 +25,16 @@ export default function useTheme() {
   }, [theme])
 
   useEffect(() => {
-    if (userPreferred) {
-      localStorage.setItem('theme', theme)
-    } else {
-      localStorage.removeItem('theme')
-    }
+    if (userPreferred) localStorage.setItem('theme', theme)
+    else localStorage.removeItem('theme')
   }, [theme, userPreferred])
 
   useEffect(() => {
     const mql = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = (e) => {
-      if (!userPreferred) setTheme(e.matches ? 'dark' : 'light')
-    }
+    const onChange = (e) => { if (!userPreferred) setTheme(e.matches ? 'dark' : 'light') }
     if (mql.addEventListener) mql.addEventListener('change', onChange)
     else mql.addListener(onChange)
-    return () => {
-      if (mql.removeEventListener) mql.removeEventListener('change', onChange)
-      else mql.removeListener(onChange)
-    }
+    return () => { if (mql.removeEventListener) mql.removeEventListener('change', onChange); else mql.removeListener(onChange) }
   }, [userPreferred])
 
   return { theme, setTheme, userPreferred, setUserPreferred }

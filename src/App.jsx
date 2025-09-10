@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import logo from './assets/logo.svg'
 import useTheme from './hooks/useTheme'
-import Header from './components/Header'
+import Layout from './components/layout/Layout'
 import Hero from './components/sections/Hero'
 import About from './components/sections/About'
 import Crops from './components/sections/Crops'
@@ -9,7 +9,6 @@ import Livestock from './components/sections/Livestock'
 import Social from './components/sections/Social'
 import Gallery from './components/sections/Gallery'
 import Contact from './components/sections/Contact'
-import Footer from './components/Footer'
 
 // Use only SITE_RECAPTCHA_KEY as per documentation (injected via vite.config.js define)
 const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
@@ -150,32 +149,15 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 selection:bg-emerald-400/30 selection:text-emerald-100 font-sans">
-      {/* Background layers */}
-      <div aria-hidden className="fixed inset-0 pointer-events-none">
-        <div
-          className="absolute -top-40 -left-40 h-[35rem] w-[35rem] rounded-full blur-3xl opacity-20 dark:opacity-30 motion-safe:animate-gradient will-change-transform"
-          style={{ backgroundImage: 'linear-gradient(120deg, #10b981, #06b6d4, #7c3aed)', backgroundSize: '200% 200%' }}
-          data-parallax="0.08"
-        />
-        <div className="absolute inset-0 bg-grid opacity-30 dark:opacity-100 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]" />
-      </div>
-
-      <Header theme={theme} setTheme={setTheme} userPreferred={userPreferred} setUserPreferred={setUserPreferred} />
-
-      <main className="pt-28">
-        <Hero />
-        <About />
-        <Crops />
-        <Livestock />
-        <Social />
-        <Gallery />
-        <Contact />
-      </main>
-
-      {/* Footer */}
-      <Footer />
-    </div>
+    <Layout>
+      <Hero />
+      <About />
+      <Crops />
+      <Livestock />
+      <Social />
+      <Gallery />
+      <Contact />
+    </Layout>
   )
 }
 

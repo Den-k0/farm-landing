@@ -15,7 +15,7 @@ export default function ThemeToggle({ theme, setTheme, userPreferred, setUserPre
         setUserPreferred(true)
         setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
       }}
-      className="inline-flex items-center justify-center rounded border border-black/10 dark:border-white/10 h-10 w-10 hover:bg-black/5 dark:hover:bg-white/5"
+      className="inline-flex items-center justify-center rounded border border-black/10 dark:border-white/10 h-10 w-10 hover:bg-black/5 dark:hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500"
       aria-label="Перемкнути тему (Alt — за системою)"
       aria-pressed={userPreferred ? (theme === 'dark') : undefined}
       title="Перемкнути тему (Alt — за системою)"
