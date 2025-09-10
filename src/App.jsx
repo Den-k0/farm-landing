@@ -19,51 +19,42 @@ function App() {
   const captchaRef = useRef(null)
   const captchaIdRef = useRef(null)
   const [captchaReady, setCaptchaReady] = useState(false)
-  const [captchaTried, setCaptchaTried] = useState(false)
 
-  const doRender = () => {
-    if (captchaReady) return
-    if (!RECAPTCHA_SITE_KEY) return
+  // Мінімальна версія: одноразове створення віджета. Без перерендеру при зміні теми.
+  const renderCaptchaOnce = () => {
+    if (captchaIdRef.current !== null) return // вже є
+    if (!RECAPTCHA_SITE_KEY) {
+      console.warn('[reCAPTCHA] Відсутній SITE_RECAPTCHA_KEY')
+      return
+    }
     if (!window.grecaptcha || !window.grecaptcha.render) return
     if (!captchaRef.current) return
     try {
-      captchaRef.current.innerHTML = ''
-      const id = window.grecaptcha.render(captchaRef.current, {
+      captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
         sitekey: RECAPTCHA_SITE_KEY,
-        theme: theme === 'dark' ? 'dark' : 'light',
+        theme: theme === 'dark' ? 'dark' : 'light', // фіксуємо тему при першому рендері
         callback: () => {},
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
         'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
       })
-      captchaIdRef.current = id
       setCaptchaReady(true)
     } catch (e) {
-      // тихо ігноруємо — інтервал ще раз спробує
+      console.error('[reCAPTCHA] Помилка рендеру', e)
     }
   }
 
-  // Один простий інтервал спроб (до ~8с)
   useEffect(() => {
-    let attempts = 0
-    const max = 40 // 40 * 200мс = 8с
-    const timer = setInterval(() => {
-      if (captchaReady) { clearInterval(timer); return }
-      attempts++
-      doRender()
-      if (attempts >= max) {
-        clearInterval(timer)
-        setCaptchaTried(true)
-      }
-    }, 200)
-    return () => clearInterval(timer)
+    // Колбек із скрипта
+    window.onRecaptchaLoad = () => {
+      renderCaptchaOnce()
+    }
+    // Якщо скрипт вже встиг підвантажитись
+    if (window.grecaptcha && window.grecaptcha.render) {
+      renderCaptchaOnce()
+    }
+    return () => { delete window.onRecaptchaLoad }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const manualRetry = () => {
-    setCaptchaReady(false)
-    captchaIdRef.current = null
-    doRender()
-  }
 
   const encode = (data) => {
     return Object.keys(data)
@@ -387,13 +378,10 @@ function App() {
                   maxLength={2000}
                 />
                 <div className="space-y-2">
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Захист reCAPTCHA (фіксує тему при першому завантаженні)</div>
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400">Захист reCAPTCHA (тема фіксується при першому завантаженні)</div>
                   <div ref={captchaRef} id="recaptcha-container" className="pt-1 min-h-[78px] flex items-center" aria-label="reCAPTCHA">
                     {!RECAPTCHA_SITE_KEY && <div className="text-xs text-red-600 dark:text-red-400">Немає ключа SITE_RECAPTCHA_KEY</div>}
                     {RECAPTCHA_SITE_KEY && !captchaReady && <div className="animate-pulse h-10 w-64 rounded bg-neutral-200 dark:bg-neutral-700" />}
-                    {RECAPTCHA_SITE_KEY && !captchaReady && captchaTried && (
-                      <button type="button" onClick={manualRetry} className="ml-2 text-xs underline text-emerald-600 dark:text-emerald-400">Перезавантажити</button>
-                    )}
                   </div>
                 </div>
                 <button
