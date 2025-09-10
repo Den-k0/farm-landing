@@ -25,11 +25,10 @@
         } catch {}
       })()
     </script>
-    <!-- reCAPTCHA v2 script -->
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
   </head>
   <body>
-    <!-- Hidden Netlify registration form (з placeholder reCAPTCHA для build-скану) -->
+    <!-- Hidden Netlify registration form (без reCAPTCHA placeholder) -->
     <form name="contact" data-netlify="true" netlify-honeypot="bot-field" hidden>
       <input type="hidden" name="form-name" value="contact" />
       <input type="text" name="firstName" />
@@ -37,7 +36,6 @@
       <input type="email" name="email" />
       <textarea name="message"></textarea>
       <input name="bot-field" />
-      <div data-netlify-recaptcha="true"></div>
     </form>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

@@ -17,6 +17,26 @@ function App() {
   const [submitting, setSubmitting] = useState(false)
   const iframeRef = useRef(null)
   const pendingSubmitRef = useRef(false)
+  const recaptchaRef = useRef(null)
+  const recaptchaWidgetIdRef = useRef(null)
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY || '6LdnkKEqAAAAAPvyqoRAmjXxvE6evlb5z-5Ol90Y'
+
+  useEffect(() => {
+    let cancelled = false
+    const tryRender = () => {
+      if (cancelled) return
+      if (recaptchaRef.current && window.grecaptcha && window.grecaptcha.render && recaptchaWidgetIdRef.current == null) {
+        try {
+          const id = window.grecaptcha.render(recaptchaRef.current, { sitekey: siteKey })
+          recaptchaWidgetIdRef.current = id
+        } catch {}
+      } else if (recaptchaWidgetIdRef.current == null) {
+        setTimeout(tryRender, 300)
+      }
+    }
+    tryRender()
+    return () => { cancelled = true }
+  }, [siteKey])
 
   const handleSubmit = (e) => {
     if (submitting) { e.preventDefault(); return }
@@ -32,25 +52,31 @@ function App() {
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
+    // reCAPTCHA token
+    let token = ''
+    try { if (window.grecaptcha?.getResponse && recaptchaWidgetIdRef.current != null) token = window.grecaptcha.getResponse(recaptchaWidgetIdRef.current) || '' } catch {}
+    if (siteKey && token.length < 20) {
+      e.preventDefault()
+      setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
+      return
+    }
     setSubmitting(true)
     setStatus({ type: 'info', msg: 'Надсилання…' })
     pendingSubmitRef.current = true
-    // НЕ preventDefault → нативний submit у прихований iframe
   }
 
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe) return
     const onLoad = () => {
-      if (!pendingSubmitRef.current) return // ігнор початкове завантаження
-      // Після редіректу Netlify повертає HTML сторінки – вважаємо успіхом
+      if (!pendingSubmitRef.current) return
       pendingSubmitRef.current = false
       setSubmitting(false)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      // reCAPTCHA Netlify (checkbox) очищається автоматично при перезавантаженні у iframe; якщо ні – користувач побачить пройдену галочку (можна повторно відправити)
+      // reset reCAPTCHA
+      try { if (window.grecaptcha?.reset && recaptchaWidgetIdRef.current != null) window.grecaptcha.reset(recaptchaWidgetIdRef.current) } catch {}
     }
-    // Позначити первинне завантаження як не сабміт
     pendingSubmitRef.current = false
     iframe.addEventListener('load', onLoad)
     return () => iframe.removeEventListener('load', onLoad)
@@ -369,7 +395,7 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div data-netlify-recaptcha="true"></div>
+                <div ref={recaptchaRef} className="g-recaptcha" />
                 {status.type && (
                   <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
                 )}
