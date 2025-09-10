@@ -6,7 +6,7 @@ import { kpis } from './data/stats'
 import { contacts as contactsData } from './data/contacts'
 import Header from './components/Header'
 
-// Use only SITE_RECAPTCHA_KEY as per documentation (injected via vite.config.js define)
+// Only SITE_RECAPTCHA_KEY
 const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
 
 function App() {
@@ -20,72 +20,38 @@ function App() {
   const captchaIdRef = useRef(null)
   const [captchaReady, setCaptchaReady] = useState(false)
 
-  // Single render helper
-  const renderCaptchaInitial = () => {
+  // Простий одноразовий рендер reCAPTCHA без додаткових кастомізацій/переміщень
+  const renderCaptcha = () => {
     if (!captchaRef.current) return
-    if (captchaIdRef.current !== null) { // already rendered
-      if (!captchaReady) setCaptchaReady(true)
-      return
-    }
-    if (!RECAPTCHA_SITE_KEY) {
-      console.warn('[reCAPTCHA] Відсутній SITE_RECAPTCHA_KEY')
-      return
-    }
+    if (captchaIdRef.current !== null) return
+    if (!RECAPTCHA_SITE_KEY) return
     if (!window.grecaptcha || !window.grecaptcha.render) return
     try {
       captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
         sitekey: RECAPTCHA_SITE_KEY,
-        theme: theme === 'dark' ? 'dark' : 'light',
         callback: () => {},
-        'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
-        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
       })
       setCaptchaReady(true)
     } catch (e) {
-      console.error('[reCAPTCHA] Помилка рендеру', e)
+      console.error('reCAPTCHA render error', e)
     }
   }
 
   useEffect(() => {
     window.onRecaptchaLoad = () => {
-      renderCaptchaInitial()
+      renderCaptcha()
     }
     if (window.grecaptcha && window.grecaptcha.render) {
-      renderCaptchaInitial()
+      renderCaptcha()
     }
   }, [])
 
-  // Re-render only inside the SAME container on theme change (stable placement)
-  useEffect(() => {
-    if (!window.grecaptcha || !captchaRef.current) return
-    if (captchaIdRef.current === null) return // not rendered yet
-    // Re-render to change theme without moving DOM node
-    try {
-      setCaptchaReady(false)
-      captchaRef.current.innerHTML = ''
-      captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
-        sitekey: RECAPTCHA_SITE_KEY,
-        theme: theme === 'dark' ? 'dark' : 'light',
-        callback: () => {},
-        'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
-        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
-      })
-      setCaptchaReady(true)
-    } catch (e) {
-      console.error('[reCAPTCHA] Помилка повторного рендеру', e)
-    }
-  }, [theme])
-
-  const encode = (data) => {
-    return Object.keys(data)
-      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
-      .join('&')
-  }
+  const encode = (data) => Object.keys(data).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(data[k])).join('&')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (submitting) return
-    
+
     setStatus({ type: null, msg: '' })
     const { firstName, email, message } = formState
     if (!firstName.trim() || !email.trim() || !message.trim()) {
@@ -96,7 +62,7 @@ function App() {
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
-    
+
     const token = window.grecaptcha?.getResponse(captchaIdRef.current)
     if (!token) {
       setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
@@ -110,46 +76,37 @@ function App() {
       'form-name': 'contact',
       'g-recaptcha-response': token,
       ...formState,
-      pageUrl: window.location.href
+      pageUrl: window.location.href,
     }
 
     try {
-      const response = await fetch('/', {
+      const res = await fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: encode(formData)
+        body: encode(formData),
       })
-
-      if (response.ok) {
+      if (res.ok) {
         setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
         setFormState({ firstName: '', lastName: '', email: '', message: '' })
-        if (window.grecaptcha && captchaIdRef.current !== null) {
-          window.grecaptcha.reset(captchaIdRef.current)
-        }
+        if (window.grecaptcha && captchaIdRef.current !== null) window.grecaptcha.reset(captchaIdRef.current)
       } else {
-        throw new Error('Network response was not ok.')
+        throw new Error('Bad response')
       }
-    } catch (error) {
+    } catch {
       setStatus({ type: 'error', msg: 'Помилка при надсиланні. Спробуйте ще раз.' })
     } finally {
       setSubmitting(false)
     }
   }
 
-  // Інші useEffect та код залишаються незмінними
-  // ... (решта вашого коду)
-
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 selection:bg-emerald-400/30 selection:text-emerald-100 font-sans">
-      {/* Background layers: visible in both themes (lighter in light) */}
       <div aria-hidden className="fixed inset-0 pointer-events-none">
-        {/* animated gradient blob */}
         <div
           className="absolute -top-40 -left-40 h-[35rem] w-[35rem] rounded-full blur-3xl opacity-20 dark:opacity-30 motion-safe:animate-gradient will-change-transform"
           style={{ backgroundImage: 'linear-gradient(120deg, #10b981, #06b6d4, #7c3aed)', backgroundSize: '200% 200%' }}
           data-parallax="0.08"
         />
-        {/* subtle grid */}
         <div className="absolute inset-0 bg-grid opacity-30 dark:opacity-100 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_70%)]" />
       </div>
 
@@ -172,7 +129,6 @@ function App() {
                   <a href="#about" className="px-6 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-900 font-semibold shadow-[0_0_30px_#10b981]/40 transition">Дізнатися більше</a>
                   <a href="#contact" className="px-6 py-3 rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition">Контакти</a>
                 </div>
-                {/* KPI cards */}
                 <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl">
                   {kpis.map(({ id, stat, label }) => (
                     <div key={id} className="rounded-xl border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-4 text-center">
@@ -182,8 +138,6 @@ function App() {
                   ))}
                 </div>
               </div>
-
-              {/* Hero image */}
               <div className="relative flex items-center justify-center">
                 <img
                   src={logo}
@@ -327,15 +281,12 @@ function App() {
                   </div>
                   <div>Код ЄДРПОУ: 37625021</div>
                   <div>
-                    Ел. пошта:
-                    {' '}
+                    Ел. пошта:{' '}
                     <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="mailto:kaluna.loshniv@ukr.net">kaluna.loshniv@ukr.net</a>
                     {', '}
                     <a className="underline hover:text-emerald-600 dark:hover:text-emerald-400" href="mailto:agroprogrester@ukr.net">agroprogrester@ukr.net</a>
                   </div>
                 </div>
-
-                {/* Key contacts */}
                 <div className="mt-6 grid sm:grid-cols-2 gap-3 text-sm text-neutral-700 dark:text-neutral-300">
                   {contactsData.map(({ name, position, phone }) => (
                     <div key={name} className="rounded-lg border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur p-3">
@@ -346,7 +297,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Right column: form card with heading inside */}
               <form
                 name="contact"
                 data-netlify="true"
@@ -400,7 +350,6 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* reCAPTCHA: static container (stable). Only re-render iframe in-place on theme change. */}
                 <div className="recaptcha-wrapper">
                   <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Захист reCAPTCHA</div>
                   <div
@@ -433,7 +382,6 @@ function App() {
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="relative border-t border-black/5 dark:border-white/10 py-10 text-sm text-neutral-600 dark:text-neutral-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -442,7 +390,6 @@ function App() {
           <div className="flex items-center gap-4">
             <a href="#about" className="hover:text-black dark:hover:text-white">Про нас</a>
             <a href="#contact" className="hover:text-black dark:hover:text-white">Контакти</a>
-            {/* Socials */}
             <a
               href="https://www.instagram.com/kalynaloshnivska?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
               target="_blank"
