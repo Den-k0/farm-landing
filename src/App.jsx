@@ -22,21 +22,16 @@ function App() {
     setFormState((s) => ({ ...s, [name]: value }))
   }
 
-  const encode = (data) => Object.keys(data).map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(data[k])).join('&')
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setStatus({ type: null, msg: '' })
 
-    // Acquire reCAPTCHA token (auto-rendered widget)
+    // Grab token (optional, won't block if absent)
     let token = ''
-    if (window.grecaptcha?.getResponse) {
-      token = window.grecaptcha.getResponse() || ''
-    }
-    if (!token) {
-      token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
-    }
+    if (window.grecaptcha?.getResponse) token = window.grecaptcha.getResponse() || ''
+    if (!token) token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
 
+    // Basic validations
     if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
       return
@@ -45,32 +40,35 @@ function App() {
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
-    if (recaptchaSiteKey && !token) {
-      setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
-      return
-    }
 
     setSubmitting(true)
     try {
-      const bodyData = { 'form-name': 'contact', ...formState, 'bot-field': '' }
-      if (token) bodyData['g-recaptcha-response'] = token
-      const body = encode(bodyData)
+      const formEl = e.target
+      const fd = new FormData(formEl)
+      // Sync controlled state values (in case FormData missed anything)
+      fd.set('firstName', formState.firstName)
+      fd.set('lastName', formState.lastName)
+      fd.set('email', formState.email)
+      fd.set('message', formState.message)
+      if (!fd.get('form-name')) fd.set('form-name', 'contact')
+      fd.set('bot-field', '')
+      if (token) fd.set('g-recaptcha-response', token)
+
+      const body = new URLSearchParams(fd).toString()
+      if (import.meta.env.DEV) console.log('[Form debug] body', body.slice(0,140)+'...', 'tokenLen', token.length)
+
       const res = await fetch('/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // мінімальний набір
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
-        redirect: 'follow',
+        redirect: 'follow'
       })
       const statusCode = res.status
-      const textSnippet = (await res.text()).slice(0, 160)
-      if (import.meta.env.DEV) console.log('[Form debug] raw status', statusCode, 'tokenLen', token.length, 'snippet:', textSnippet)
-      const successStatuses = [200, 201, 202, 204, 303]
-      if (!successStatuses.includes(statusCode)) throw new Error('Unexpected status ' + statusCode)
+      if (import.meta.env.DEV) console.log('[Form debug] status', statusCode)
+      if (![200,201,202,204,303].includes(statusCode)) throw new Error('Unexpected status '+statusCode)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      if (window.grecaptcha?.reset) {
-        try { window.grecaptcha.reset() } catch {}
-      }
+      if (window.grecaptcha?.reset) { try { window.grecaptcha.reset() } catch {} }
     } catch (err) {
       if (import.meta.env.DEV) console.error('[Form debug] submit error', err)
       setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
