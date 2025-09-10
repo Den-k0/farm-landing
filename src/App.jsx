@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 import logo from './assets/logo.svg'
 import useTheme from './hooks/useTheme'
@@ -15,54 +15,46 @@ function App() {
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
-  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
+  const iframeRef = useRef(null)
+  const pendingSubmitRef = useRef(false)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (submitting) return
+  const handleSubmit = (e) => {
+    if (submitting) { e.preventDefault(); return }
     setStatus({ type: null, msg: '' })
     const { firstName, email, message } = formState
     if (!firstName.trim() || !email.trim() || !message.trim()) {
+      e.preventDefault()
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
       return
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      e.preventDefault()
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
-
-    // Netlify сам вставить textarea[name="g-recaptcha-response"] після успішної перевірки
-    let token = ''
-    const ta = document.querySelector('textarea[name="g-recaptcha-response"]')
-    if (ta) token = ta.value.trim()
-    if (recaptchaSiteKey && token.length < 20) { // користувач не пройшов reCAPTCHA
-      setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
-      return
-    }
-
     setSubmitting(true)
-    try {
-      const data = {
-        'form-name': 'contact',
-        firstName: formState.firstName.trim(),
-        lastName: formState.lastName.trim(),
-        email: formState.email.trim(),
-        message: formState.message.trim(),
-        subject: 'Повідомлення з сайту',
-        'bot-field': ''
-      }
-      if (token) data['g-recaptcha-response'] = token
-      const body = new URLSearchParams(data).toString()
-      const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
-      if (!res.ok) throw new Error('Submit failed ' + res.status)
+    setStatus({ type: 'info', msg: 'Надсилання…' })
+    pendingSubmitRef.current = true
+    // НЕ preventDefault → нативний submit у прихований iframe
+  }
+
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+    const onLoad = () => {
+      if (!pendingSubmitRef.current) return // ігнор початкове завантаження
+      // Після редіректу Netlify повертає HTML сторінки – вважаємо успіхом
+      pendingSubmitRef.current = false
+      setSubmitting(false)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-    } catch (err) {
-      setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
-    } finally {
-      setSubmitting(false)
+      // reCAPTCHA Netlify (checkbox) очищається автоматично при перезавантаженні у iframe; якщо ні – користувач побачить пройдену галочку (можна повторно відправити)
     }
-  }
+    // Позначити первинне завантаження як не сабміт
+    pendingSubmitRef.current = false
+    iframe.addEventListener('load', onLoad)
+    return () => iframe.removeEventListener('load', onLoad)
+  }, [])
 
   useEffect(() => {
     const root = document.documentElement
@@ -329,6 +321,7 @@ function App() {
                 onSubmit={handleSubmit}
                 action="/"
                 method="POST"
+                target="netlify-frame"
                 className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur p-6 space-y-4"
               >
                 <input type="hidden" name="form-name" value="contact" />
@@ -376,10 +369,9 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* Офіційний placeholder reCAPTCHA. Netlify додає скрипт і textarea */}
                 <div data-netlify-recaptcha="true"></div>
                 {status.type && (
-                  <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
+                  <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
                 )}
                 <button
                   disabled={submitting}
@@ -389,6 +381,8 @@ function App() {
                 </button>
                 <p className="text-xs text-neutral-500 dark:text-neutral-500">Захищено reCAPTCHA: Google Privacy Policy & Terms apply.</p>
               </form>
+              {/* Прихований iframe для уникнення редіректу */}
+              <iframe name="netlify-frame" ref={iframeRef} hidden title="netlify-result" />
             </div>
           </div>
         </section>
