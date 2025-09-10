@@ -11,71 +11,57 @@ Single-page marketing site for the Ukrainian farm enterprise "ФГ «Калин�
 - Prettier formatting
 
 ## Features
-- Modular section components (Hero, About, Crops, Livestock, Social, Gallery, Contact)
-- Responsive layout, reduced-motion friendly animations
-- Light/Dark theme with system preference sync + manual override
-- Accessible navigation (aria labels, focus-visible outlines, semantic landmarks)
-- Netlify form submission (honeypot + reCAPTCHA token) via progressive enhancement
-- Inline reCAPTCHA explicit render with theme-aware re-render in Contact section
-- Background gradient + grid visual layer isolated in Layout
+- Modular section architecture (Hero, About, Crops, Livestock, Social, Gallery, Contact)
+- Light / Dark theme with system sync + persistent override (Alt+click reset)
+- Accessible navigation (focus-visible, aria landmarks, semantic structure)
+- Netlify form with honeypot + token submission (URL-encoded)
+- Explicit reCAPTCHA v2 render with theme-based re-render
+- Optimized static assets (WebP images, SVG logo)
 
 ## Project Structure
 ```
 root
-├─ index.html                # HTML entry (preloads theme, loads reCAPTCHA script, hidden Netlify form)
-├─ vite.config.js            # Vite config + env define for SITE_RECAPTCHA_KEY
-├─ tailwind.config.js        # Tailwind v4 config (dark mode via class)
-├─ postcss.config.js         # Tailwind + autoprefixer pipeline
-├─ eslint.config.js          # Flat ESLint config with a11y
-├─ package.json              # Scripts & dependencies
-├─ src/
-│  ├─ main.jsx               # React root render
-│  ├─ App.jsx                # Combines sections inside Layout
-│  ├─ index.css              # Tailwind import + custom utilities (gradient, grid, text-gradient)
-│  ├─ assets/                # Static svg/logo assets
-│  ├─ components/
-│  │  ├─ Header.jsx          # Fixed header + nav + mobile menu toggle
-│  │  ├─ Footer.jsx          # Footer links + social icons
-│  │  ├─ ThemeToggle.jsx     # Theme switch (Alt-click resets to system)
-│  │  ├─ icons/              # Sun/Moon icon components
-│  │  └─ layout/
-│  │     └─ Layout.jsx       # Page shell (background layers, Header, Footer, <main>)
-│  │  └─ sections/
-│  │     ├─ Hero.jsx         # Hero headline, KPIs, logo
-│  │     ├─ About.jsx        # Company description
-│  │     ├─ Crops.jsx        # Crop production highlights
-│  │     ├─ Livestock.jsx    # Livestock overview + image
-│  │     ├─ Social.jsx       # Social responsibility list
-│  │     ├─ Gallery.jsx      # Image gallery grid (static sources)
-│  │     └─ Contact.jsx      # Contact info + Netlify form + reCAPTCHA
-│  ├─ hooks/
-│  │  └─ useTheme.js         # Theme state (persist & system sync)
-│  ├─ data/
-│  │  ├─ stats.js            # KPI statistics for hero
-│  │  ├─ gallery.js          # Gallery image source list
-│  │  └─ contacts.js         # Contact people list
-│  ├─ utils/
-│  │  └─ form.js             # encode() + validateContact()
-│  └─ App.jsx                # (Imported by main) renders sections via Layout
-└─ public/                   # Public images (imported by path)
+├─ index.html              # Entry HTML, theme pre-init, reCAPTCHA script, hidden Netlify form
+├─ vite.config.js          # Vite config (exposes SITE_RECAPTCHA_KEY)
+├─ tailwind.config.js      # Tailwind v4 config (dark mode class)
+├─ postcss.config.js       # PostCSS (Tailwind + autoprefixer)
+├─ eslint.config.js        # Flat ESLint config
+├─ package.json            # Scripts + dependencies
+├─ README.md               # Documentation
+├─ public/                 # Public static images (served as-is)
+└─ src/
+   ├─ main.jsx             # React root render
+   ├─ App.jsx              # Assembles sections inside Layout
+   ├─ index.css            # Tailwind import + custom utilities (gradients, text effects)
+   ├─ assets/              # SVG logos
+   ├─ data/                # stats.js, gallery.js, contacts.js
+   ├─ hooks/
+   │  └─ useTheme.js       # Theme state + persistence + system sync
+   ├─ utils/
+   │  └─ form.js           # encode(), validateContact()
+   └─ components/
+      ├─ Header.jsx        # Top navigation + mobile menu + ThemeToggle
+      ├─ Footer.jsx        # Footer links + social icons
+      ├─ ThemeToggle.jsx   # Theme switch control
+      ├─ icons/            # Sun / Moon icons
+      ├─ layout/
+      │  └─ Layout.jsx     # Background layers + shell (Header, Footer, <main>)
+      └─ sections/
+         ├─ Hero.jsx       # Hero heading, KPIs, logo
+         ├─ About.jsx      # Company description
+         ├─ Crops.jsx      # Crop production summary
+         ├─ Livestock.jsx  # Livestock overview + image
+         ├─ Social.jsx     # Social responsibility
+         ├─ Gallery.jsx    # Image grid
+         └─ Contact.jsx    # Contacts + Netlify form + reCAPTCHA
 ```
 
-## Environment Variables
-Set in Netlify UI or local `.env` (never commit secrets):
-- SITE_RECAPTCHA_KEY: public reCAPTCHA v2 checkbox site key (exposed to client)
-(Secret key is stored only in Netlify backend settings; not in repository.)
-
-## reCAPTCHA Integration
-1. `index.html` loads the Google script with `onload=onRecaptchaLoad&render=explicit`.
-2. Hidden Netlify form registers fields for build parsing.
-3. Contact component explicitly renders reCAPTCHA into a ref container; on theme change it resets and re-renders with updated theme.
-4. Contact form fetch-posts URL-encoded body including `g-recaptcha-response` token.
-
-## Form Handling
-- Validation: minimal client-side (required fields + email regex) via `validateContact`.
-- Honeypot: `bot-field` hidden input.
-- Rate limiting: 3 second cooldown between submissions.
-- Accessible status region with `aria-live`.
+## Environment
+Create `.env` (NOT committed):
+```
+SITE_RECAPTCHA_KEY=your_public_v2_checkbox_site_key
+```
+Netlify: set the same key in build environment. Secret key configured only in Netlify admin (server side).
 
 ## Theming
 - Dark mode toggled by adding/removing `dark` class on `<html>` (and body for safety).
@@ -108,16 +94,6 @@ npm run lint
 npm run format
 ```
 
-## Potential Improvements
-- Image optimization (WebP/AVIF + <picture>)
-- Lazy loading heavy sections (Gallery) with `React.lazy`
-- Structured data (JSON-LD) for Organization
-- Central Card / Section UI primitives
-- Unit tests for recaptcha render + form utils
-
 ## Deployment
 - Deployed to Netlify; form + reCAPTCHA handled automatically server-side.
 - Ensure `SITE_RECAPTCHA_KEY` is present in Netlify environment variables before build.
-
-## License
-Internal project (no explicit OSS license specified). Add a LICENSE file if open-sourcing.

@@ -42,3 +42,10 @@
 
 /* Anchor offset under fixed header */
 #about, #crops, #livestock, #social, #gallery, #contact { scroll-margin-top: 6rem; }
+
+/* Accessible text selection: separate light/dark for proper contrast */
+::selection { background: #d1fae5; color: #064e3b; }
+html.dark ::selection { background: #065f46; color: #ecfdf5; }
+/* Firefox */
+::-moz-selection { background: #d1fae5; color: #064e3b; }
+html.dark ::-moz-selection { background: #065f46; color: #ecfdf5; }

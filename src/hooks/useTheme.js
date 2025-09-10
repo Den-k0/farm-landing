@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
 
-/**
- * Theme hook: manages light/dark, persists user preference, reacts to system changes.
- * Returns { theme, setTheme, userPreferred, setUserPreferred }.
- */
+// useTheme: manages light/dark theme; persists explicit user choice and syncs with system when no user override.
 export default function useTheme() {
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark'

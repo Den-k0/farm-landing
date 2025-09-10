@@ -1,5 +1,5 @@
 export default function Livestock() {
-  const livestockImage = '/photo_pigs.jpeg'
+  const livestockImage = '/photo_pigs.webp'
   return (
     <section id="livestock" className="relative py-24 scroll-mt-24">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
