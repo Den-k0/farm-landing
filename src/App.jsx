@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 import logo from './assets/logo.svg'
 import useTheme from './hooks/useTheme'
@@ -16,6 +16,26 @@ function App() {
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
   const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
+  const recaptchaRef = useRef(null)
+  const [recaptchaWidgetId, setRecaptchaWidgetId] = useState(null)
+
+  useEffect(() => {
+    if (!recaptchaSiteKey) return
+    let cancelled = false
+    const tryRender = () => {
+      if (cancelled) return
+      if (window.grecaptcha?.render && recaptchaRef.current && recaptchaWidgetId === null) {
+        try {
+          const id = window.grecaptcha.render(recaptchaRef.current, { sitekey: recaptchaSiteKey })
+            setRecaptchaWidgetId(id)
+        } catch {}
+      } else if (recaptchaWidgetId === null) {
+        setTimeout(tryRender, 300)
+      }
+    }
+    tryRender()
+    return () => { cancelled = true }
+  }, [recaptchaSiteKey, recaptchaWidgetId])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -38,7 +58,17 @@ function App() {
     }
 
     let token = ''
-    try { if (window.grecaptcha?.getResponse) token = window.grecaptcha.getResponse() || '' } catch {}
+    try {
+      if (recaptchaWidgetId !== null && window.grecaptcha?.getResponse) {
+        token = window.grecaptcha.getResponse(recaptchaWidgetId) || ''
+      } else if (document.querySelector('textarea[name="g-recaptcha-response"]')) {
+        token = document.querySelector('textarea[name="g-recaptcha-response"]').value || ''
+      }
+    } catch {}
+    if (recaptchaSiteKey && !token) {
+      setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -50,6 +80,9 @@ function App() {
       fd.set('message', formState.message)
       if (!fd.get('form-name')) fd.set('form-name', 'contact')
       if (token) fd.set('g-recaptcha-response', token)
+      fd.set('subject', 'Повідомлення з сайту')
+      // Honey pot ensure empty
+      if (!fd.get('bot-field')) fd.set('bot-field', '')
 
       const body = new URLSearchParams(fd).toString()
       const res = await fetch('/', {
@@ -60,7 +93,7 @@ function App() {
       if (!res.ok) throw new Error('Submit failed ' + res.status)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      try { if (window.grecaptcha?.reset) window.grecaptcha.reset() } catch {}
+      try { if (recaptchaWidgetId !== null && window.grecaptcha?.reset) window.grecaptcha.reset(recaptchaWidgetId) } catch {}
     } catch (err) {
       setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
     } finally {
@@ -381,7 +414,7 @@ function App() {
                   maxLength={2000}
                 />
                 {recaptchaSiteKey && (
-                  <div className="g-recaptcha" data-sitekey={recaptchaSiteKey}></div>
+                  <div ref={recaptchaRef} className="g-recaptcha" />
                 )}
                 {!recaptchaSiteKey && (
                   <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY.</div>
