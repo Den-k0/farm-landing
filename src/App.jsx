@@ -6,7 +6,7 @@ import { kpis } from './data/stats'
 import { contacts as contactsData } from './data/contacts'
 import Header from './components/Header'
 
-// Only SITE_RECAPTCHA_KEY
+// Use only SITE_RECAPTCHA_KEY as per documentation (injected via vite.config.js define)
 const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
 
 function App() {
@@ -20,21 +20,24 @@ function App() {
   const captchaIdRef = useRef(null)
   const [captchaReady, setCaptchaReady] = useState(false)
 
-  // Простий одноразовий рендер reCAPTCHA без додаткових кастомізацій/переміщень
+  // Одноразовий рендер без переміщення / перевставлення
   const renderCaptcha = () => {
-    if (!captchaRef.current) return
+    if (!window.grecaptcha || !captchaRef.current) return
     if (captchaIdRef.current !== null) return
-    if (!RECAPTCHA_SITE_KEY) return
-    if (!window.grecaptcha || !window.grecaptcha.render) return
+    if (!RECAPTCHA_SITE_KEY) {
+      console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set in environment)')
+      return
+    }
     try {
       captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
         sitekey: RECAPTCHA_SITE_KEY,
+        theme: theme === 'dark' ? 'dark' : 'light',
         callback: () => {},
+        'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
+        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
       })
       setCaptchaReady(true)
-    } catch (e) {
-      console.error('reCAPTCHA render error', e)
-    }
+    } catch {}
   }
 
   useEffect(() => {
@@ -46,12 +49,16 @@ function App() {
     }
   }, [])
 
-  const encode = (data) => Object.keys(data).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(data[k])).join('&')
+  const encode = (data) => {
+    return Object.keys(data)
+      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
+      .join('&')
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (submitting) return
-
+    
     setStatus({ type: null, msg: '' })
     const { firstName, email, message } = formState
     if (!firstName.trim() || !email.trim() || !message.trim()) {
@@ -62,7 +69,7 @@ function App() {
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
-
+    
     const token = window.grecaptcha?.getResponse(captchaIdRef.current)
     if (!token) {
       setStatus({ type: 'error', msg: 'Підтвердьте reCAPTCHA.' })
@@ -76,23 +83,26 @@ function App() {
       'form-name': 'contact',
       'g-recaptcha-response': token,
       ...formState,
-      pageUrl: window.location.href,
+      pageUrl: window.location.href
     }
 
     try {
-      const res = await fetch('/', {
+      const response = await fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: encode(formData),
+        body: encode(formData)
       })
-      if (res.ok) {
+
+      if (response.ok) {
         setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
         setFormState({ firstName: '', lastName: '', email: '', message: '' })
-        if (window.grecaptcha && captchaIdRef.current !== null) window.grecaptcha.reset(captchaIdRef.current)
+        if (window.grecaptcha && captchaIdRef.current !== null) {
+          window.grecaptcha.reset(captchaIdRef.current)
+        }
       } else {
-        throw new Error('Bad response')
+        throw new Error('Network response was not ok.')
       }
-    } catch {
+    } catch (error) {
       setStatus({ type: 'error', msg: 'Помилка при надсиланні. Спробуйте ще раз.' })
     } finally {
       setSubmitting(false)
@@ -101,6 +111,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 selection:bg-emerald-400/30 selection:text-emerald-100 font-sans">
+      {/* Background layers */}
       <div aria-hidden className="fixed inset-0 pointer-events-none">
         <div
           className="absolute -top-40 -left-40 h-[35rem] w-[35rem] rounded-full blur-3xl opacity-20 dark:opacity-30 motion-safe:animate-gradient will-change-transform"
@@ -297,6 +308,7 @@ function App() {
                 </div>
               </div>
 
+              {/* Form */}
               <form
                 name="contact"
                 data-netlify="true"
@@ -350,22 +362,16 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div className="recaptcha-wrapper">
-                  <div className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Захист reCAPTCHA</div>
-                  <div
-                    ref={captchaRef}
-                    id="recaptcha-container"
-                    className="min-h-[78px] flex items-center justify-start"
-                    aria-label="reCAPTCHA"
-                  >
-                    {!RECAPTCHA_SITE_KEY && (
-                      <div className="text-xs text-red-600 dark:text-red-400">Немає ключа SITE_RECAPTCHA_KEY</div>
-                    )}
-                    {RECAPTCHA_SITE_KEY && !captchaReady && (
-                      <div className="animate-pulse h-10 w-64 rounded bg-neutral-200 dark:bg-neutral-700" />
-                    )}
-                  </div>
-                </div>
+                {/* reCAPTCHA static widget */}
+                <div
+                  ref={captchaRef}
+                  id="recaptcha-container"
+                  className="min-h-[78px] pt-1"
+                  aria-label="reCAPTCHA"
+                />
+                {status.type && (
+                  <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
+                )}
                 <button
                   disabled={submitting || !captchaReady}
                   aria-disabled={submitting || !captchaReady}
@@ -373,15 +379,13 @@ function App() {
                 >
                   {submitting ? 'Надсилання…' : 'Надіслати'}
                 </button>
-                {status.type && (
-                  <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
-                )}
               </form>
             </div>
           </div>
         </section>
       </main>
 
+      {/* Footer */}
       <footer className="relative border-t border-black/5 dark:border-white/10 py-10 text-sm text-neutral-600 dark:text-neutral-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
