@@ -26,6 +26,9 @@ function App() {
     e.preventDefault()
     setStatus({ type: null, msg: '' })
 
+    const debugStamp = Date.now().toString()
+    console.log('[DEBUG submit] start', debugStamp)
+
     // Grab token (optional, won't block if absent)
     let token = ''
     if (window.grecaptcha?.getResponse) token = window.grecaptcha.getResponse() || ''
@@ -45,17 +48,19 @@ function App() {
     try {
       const formEl = e.target
       const fd = new FormData(formEl)
-      // Sync controlled state values (in case FormData missed anything)
+      // Sync controlled state values
       fd.set('firstName', formState.firstName)
       fd.set('lastName', formState.lastName)
       fd.set('email', formState.email)
       fd.set('message', formState.message)
       if (!fd.get('form-name')) fd.set('form-name', 'contact')
       fd.set('bot-field', '')
+      fd.set('debugStamp', debugStamp)
       if (token) fd.set('g-recaptcha-response', token)
 
       const body = new URLSearchParams(fd).toString()
-      if (import.meta.env.DEV) console.log('[Form debug] body', body.slice(0,140)+'...', 'tokenLen', token.length)
+      console.log('[DEBUG submit] body=', body)
+      console.log('[DEBUG submit] tokenLen', token.length)
 
       const res = await fetch('/', {
         method: 'POST',
@@ -64,13 +69,13 @@ function App() {
         redirect: 'follow'
       })
       const statusCode = res.status
-      if (import.meta.env.DEV) console.log('[Form debug] status', statusCode)
+      console.log('[DEBUG submit] status', statusCode, 'nf-request-id', res.headers.get('x-nf-request-id'))
       if (![200,201,202,204,303].includes(statusCode)) throw new Error('Unexpected status '+statusCode)
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
       if (window.grecaptcha?.reset) { try { window.grecaptcha.reset() } catch {} }
     } catch (err) {
-      if (import.meta.env.DEV) console.error('[Form debug] submit error', err)
+      console.error('[Form debug] submit error', err)
       setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
     } finally {
       setSubmitting(false)
@@ -339,7 +344,9 @@ function App() {
                 name="contact"
                 data-netlify="true"
                 netlify-honeypot="bot-field"
-                onSubmit={handleSubmit}
+                /* onSubmit={handleSubmit}  TEMP: вимкнено для нативного тесту */
+                action="/"
+                method="POST"
                 className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur p-6 space-y-4"
               >
                 <input type="hidden" name="form-name" value="contact" />
