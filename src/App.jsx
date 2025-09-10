@@ -61,40 +61,58 @@ function App() {
     try {
       if (recaptchaWidgetId !== null && window.grecaptcha?.getResponse) {
         token = window.grecaptcha.getResponse(recaptchaWidgetId) || ''
-      } else if (document.querySelector('textarea[name="g-recaptcha-response"]')) {
-        token = document.querySelector('textarea[name="g-recaptcha-response"]').value || ''
+      } else {
+        const ta = document.querySelector('textarea[name="g-recaptcha-response"]')
+        if (ta) token = ta.value || ''
       }
-    } catch {}
-    if (recaptchaSiteKey && !token) {
+    } catch (err) {
+      console.warn('reCAPTCHA getResponse error', err)
+    }
+    if (recaptchaSiteKey && token.length < 20) { // більшість валідних токенів > 500 символів
       setStatus({ type: 'error', msg: 'Підтвердіть reCAPTCHA.' })
       return
     }
 
     setSubmitting(true)
     try {
-      const formEl = e.target
-      const fd = new FormData(formEl)
-      fd.set('firstName', formState.firstName)
-      fd.set('lastName', formState.lastName)
-      fd.set('email', formState.email)
-      fd.set('message', formState.message)
-      if (!fd.get('form-name')) fd.set('form-name', 'contact')
-      if (token) fd.set('g-recaptcha-response', token)
-      fd.set('subject', 'Повідомлення з сайту')
-      // Honey pot ensure empty
-      if (!fd.get('bot-field')) fd.set('bot-field', '')
+      const data = {
+        'form-name': 'contact',
+        firstName: formState.firstName.trim(),
+        lastName: formState.lastName.trim(),
+        email: formState.email.trim(),
+        message: formState.message.trim(),
+        subject: 'Повідомлення з сайту',
+        'bot-field': ''
+      }
+      if (token) data['g-recaptcha-response'] = token
 
-      const body = new URLSearchParams(fd).toString()
+      const body = Object.entries(data)
+        .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+        .join('&')
+
+      console.log('[FORM] submit body=', body)
+
       const res = await fetch('/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body
       })
-      if (!res.ok) throw new Error('Submit failed ' + res.status)
+      const text = await res.text()
+      console.log('[FORM] status', res.status, 'len', text.length)
+      if (!res.ok) {
+        console.log('[FORM] response snippet:', text.slice(0, 300))
+        throw new Error('Submit failed ' + res.status)
+      }
+      // Евристика: чи Netlify віддав HTML сторінки (очікувано) — шукаємо <html
+      if (!/<!doctype/i.test(text) && !/<html/i.test(text)) {
+        console.warn('[FORM] unexpected response (не HTML?) snippet:', text.slice(0,120))
+      }
       setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
       setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      try { if (recaptchaWidgetId !== null && window.grecaptcha?.reset) window.grecaptcha.reset(recaptchaWidgetId) } catch {}
+      // reset повільніше щоб Netlify встиг зчитати textarea (перестраховка)
+      setTimeout(() => { try { if (recaptchaWidgetId !== null && window.grecaptcha?.reset) window.grecaptcha.reset(recaptchaWidgetId) } catch {} }, 800)
     } catch (err) {
+      console.error('[FORM] error', err)
       setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
     } finally {
       setSubmitting(false)
