@@ -19,11 +19,17 @@
       (() => {
         try {
           const ls = localStorage.getItem('theme')
-          const mql = window.matchMedia('(prefers-color-scheme: dark)')
-          const isDark = ls ? ls === 'dark' : mql.matches
+            , mql = window.matchMedia('(prefers-color-scheme: dark)')
+            , isDark = ls ? ls === 'dark' : mql.matches
           if (isDark) document.documentElement.classList.add('dark')
         } catch {}
       })()
+      // Bridge global callback expected by reCAPTCHA (onRecaptchaLoad) to the hook's internal one (__onRecaptchaGlobal)
+      window.onRecaptchaLoad = function () {
+        if (typeof window.__onRecaptchaGlobal === 'function') {
+          window.__onRecaptchaGlobal()
+        }
+      }
     </script>
     <!-- Updated reCAPTCHA script for explicit rendering with onload callback -->
     <script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit" async defer></script>

@@ -40,7 +40,7 @@ export default function Contact() {
   }
 
   return (
-    <section id="contact" className="relative py-24 scroll-mt-24" aria-labelledby="contact-title">
+    <section id="contact" className="relative py-24 scroll-mt-24" aria-labelledby="contact-title" role="region">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid md:grid-cols-2 gap-10">
           <div>
