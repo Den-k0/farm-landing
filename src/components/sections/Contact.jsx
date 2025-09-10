@@ -6,39 +6,38 @@ import { encode, validateContact } from '../../utils/form'
 const RECAPTCHA_SITE_KEY = import.meta.env.SITE_RECAPTCHA_KEY
 
 export default function Contact() {
-  const { theme } = useTheme()
+  // --- FORM STATE ---
+  const { theme } = useTheme() // exact old pattern
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
   const [submitting, setSubmitting] = useState(false)
   const [lastSubmitTime, setLastSubmitTime] = useState(0)
 
-  // Manual reCAPTCHA management (old model)
+  // --- RECAPTCHA STATE (old model) ---
   const captchaRef = useRef(null)
   const captchaIdRef = useRef(null)
   const recaptchaLoadedRef = useRef(false)
   const renderVersionRef = useRef(0)
   const [captchaReady, setCaptchaReady] = useState(false)
-  const lastThemeRef = useRef(null)
 
+  // Old performRender identical semantics
   const performRender = () => {
     if (!window.grecaptcha || !captchaRef.current) return
-    if (!RECAPTCHA_SITE_KEY) { console.warn('Missing SITE_RECAPTCHA_KEY'); return }
+    if (!RECAPTCHA_SITE_KEY) { console.warn('Missing SITE_RECAPTCHA_KEY (ensure it is set)'); return }
     setCaptchaReady(false)
     while (captchaRef.current.firstChild) captchaRef.current.removeChild(captchaRef.current.firstChild)
     const inner = document.createElement('div')
     captchaRef.current.appendChild(inner)
     const currentVersion = ++renderVersionRef.current
-    const currentTheme = theme === 'dark' ? 'dark' : 'light'
-    lastThemeRef.current = currentTheme
     try {
       captchaIdRef.current = window.grecaptcha.render(inner, {
         sitekey: RECAPTCHA_SITE_KEY,
-        theme: currentTheme,
+        theme: theme === 'dark' ? 'dark' : 'light',
         callback: () => {},
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
         'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
       })
-      setTimeout(() => { if (renderVersionRef.current === currentVersion) setCaptchaReady(true) }, 60)
+      setTimeout(() => { if (renderVersionRef.current === currentVersion) setCaptchaReady(true) }, 50)
     } catch (e) {
       console.warn('reCAPTCHA render error', e)
       setTimeout(() => { if (renderVersionRef.current === currentVersion && !captchaReady) performRender() }, 400)
@@ -50,7 +49,7 @@ export default function Contact() {
     performRender()
   }
 
-  // Load handling (keeps existing index.html script but layers our callback)
+  // Script load -> first render (old logic clone)
   useEffect(() => {
     const prev = window.onRecaptchaLoad
     window.onRecaptchaLoad = () => {
@@ -64,17 +63,18 @@ export default function Contact() {
     }
   }, [])
 
-  // Theme change re-render (only if theme actually changed)
+  // Theme change => full rebuild (old behaviour)
   useEffect(() => {
     if (!recaptchaLoadedRef.current) return
     if (!window.grecaptcha) return
-    const desiredTheme = theme === 'dark' ? 'dark' : 'light'
-    if (lastThemeRef.current === desiredTheme) return
-    // Fully re-render WITHOUT calling grecaptcha.reset (cleaner for theme switch)
-    captchaIdRef.current = null
+    if (captchaIdRef.current !== null) {
+      try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
+      captchaIdRef.current = null
+    }
     performRender()
   }, [theme])
 
+  // --- FORM HANDLERS ---
   const onChange = (field) => (e) => setFormState(s => ({ ...s, [field]: e.target.value }))
 
   const handleSubmit = async (e) => {
