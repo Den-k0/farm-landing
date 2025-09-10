@@ -18,6 +18,7 @@ export default function Contact() {
   const recaptchaLoadedRef = useRef(false)
   const renderVersionRef = useRef(0)
   const [captchaReady, setCaptchaReady] = useState(false)
+  const lastThemeRef = useRef(null)
 
   const performRender = () => {
     if (!window.grecaptcha || !captchaRef.current) return
@@ -27,10 +28,12 @@ export default function Contact() {
     const inner = document.createElement('div')
     captchaRef.current.appendChild(inner)
     const currentVersion = ++renderVersionRef.current
+    const currentTheme = theme === 'dark' ? 'dark' : 'light'
+    lastThemeRef.current = currentTheme
     try {
       captchaIdRef.current = window.grecaptcha.render(inner, {
         sitekey: RECAPTCHA_SITE_KEY,
-        theme: theme === 'dark' ? 'dark' : 'light',
+        theme: currentTheme,
         callback: () => {},
         'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
         'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
@@ -61,14 +64,14 @@ export default function Contact() {
     }
   }, [])
 
-  // Theme change re-render
+  // Theme change re-render (only if theme actually changed)
   useEffect(() => {
     if (!recaptchaLoadedRef.current) return
     if (!window.grecaptcha) return
-    if (captchaIdRef.current !== null) {
-      try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
-      captchaIdRef.current = null
-    }
+    const desiredTheme = theme === 'dark' ? 'dark' : 'light'
+    if (lastThemeRef.current === desiredTheme) return
+    // Fully re-render WITHOUT calling grecaptcha.reset (cleaner for theme switch)
+    captchaIdRef.current = null
     performRender()
   }, [theme])
 
