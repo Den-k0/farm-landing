@@ -14,72 +14,27 @@ function App() {
   const livestockImage = '/photo_pigs.jpeg'
   const [formState, setFormState] = useState({ firstName: '', lastName: '', email: '', message: '' })
   const [status, setStatus] = useState({ type: null, msg: '' })
-  const [submitting, setSubmitting] = useState(false)
-  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || import.meta.env.RECAPTCHA_SITE_KEY
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormState((s) => ({ ...s, [name]: value }))
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  // (B) Без кастомного fetch — нативне надсилання
+  const handleSubmit = (e) => {
     setStatus({ type: null, msg: '' })
-
-    const debugStamp = Date.now().toString()
-    console.log('[DEBUG submit] start', debugStamp)
-
-    // Grab token (optional, won't block if absent)
-    let token = ''
-    if (window.grecaptcha?.getResponse) token = window.grecaptcha.getResponse() || ''
-    if (!token) token = document.querySelector('textarea[name="g-recaptcha-response"]')?.value || ''
-
-    // Basic validations
-    if (!formState.firstName.trim() || !formState.email.trim() || !formState.message.trim()) {
+    const { firstName, email, message } = formState
+    if (!firstName.trim() || !email.trim() || !message.trim()) {
+      e.preventDefault()
       setStatus({ type: 'error', msg: 'Заповніть обовʼязкові поля.' })
       return
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      e.preventDefault()
       setStatus({ type: 'error', msg: 'Некоректний email.' })
       return
     }
-
-    setSubmitting(true)
-    try {
-      const formEl = e.target
-      const fd = new FormData(formEl)
-      // Sync controlled state values
-      fd.set('firstName', formState.firstName)
-      fd.set('lastName', formState.lastName)
-      fd.set('email', formState.email)
-      fd.set('message', formState.message)
-      if (!fd.get('form-name')) fd.set('form-name', 'contact')
-      fd.set('bot-field', '')
-      fd.set('debugStamp', debugStamp)
-      if (token) fd.set('g-recaptcha-response', token)
-
-      const body = new URLSearchParams(fd).toString()
-      console.log('[DEBUG submit] body=', body)
-      console.log('[DEBUG submit] tokenLen', token.length)
-
-      const res = await fetch('/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-        redirect: 'follow'
-      })
-      const statusCode = res.status
-      console.log('[DEBUG submit] status', statusCode, 'nf-request-id', res.headers.get('x-nf-request-id'))
-      if (![200,201,202,204,303].includes(statusCode)) throw new Error('Unexpected status '+statusCode)
-      setStatus({ type: 'success', msg: 'Повідомлення надіслано.' })
-      setFormState({ firstName: '', lastName: '', email: '', message: '' })
-      if (window.grecaptcha?.reset) { try { window.grecaptcha.reset() } catch {} }
-    } catch (err) {
-      console.error('[Form debug] submit error', err)
-      setStatus({ type: 'error', msg: 'Помилка надсилання. Спробуйте пізніше.' })
-    } finally {
-      setSubmitting(false)
-    }
+    // Якщо все ок — не перешкоджаємо стандартному submit (Netlify обробить)
   }
 
   useEffect(() => {
@@ -344,7 +299,7 @@ function App() {
                 name="contact"
                 data-netlify="true"
                 netlify-honeypot="bot-field"
-                /* onSubmit={handleSubmit}  TEMP: вимкнено для нативного тесту */
+                onSubmit={handleSubmit}
                 action="/"
                 method="POST"
                 className="rounded-2xl border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/[0.03] backdrop-blur p-6 space-y-4"
@@ -394,21 +349,10 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                {/* Auto-render reCAPTCHA widget */}
-                {recaptchaSiteKey && (
-                  <div className="g-recaptcha" data-sitekey={recaptchaSiteKey}></div>
-                )}
-                {!recaptchaSiteKey && (
-                  <div className="text-xs text-red-600 dark:text-red-500">Не задано VITE_RECAPTCHA_SITE_KEY / RECAPTCHA_SITE_KEY (створіть .env).</div>
-                )}
-                {status.type && (
-                  <div aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.msg}</div>
-                )}
                 <button
-                  disabled={submitting}
-                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
+                  className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500/90 hover:dark:bg-emerald-400 text-white dark:text-neutral-900 py-3 font-semibold transition"
                 >
-                  {submitting ? 'Надсилання…' : 'Надіслати'}
+                  Надіслати
                 </button>
                 <p className="text-xs text-neutral-500 dark:text-neutral-500">Захищено reCAPTCHA: Google Privacy Policy & Terms apply.</p>
               </form>
