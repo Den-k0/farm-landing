@@ -24,50 +24,48 @@ function App() {
   const renderCaptcha = () => {
     if (!window.grecaptcha || !captchaRef.current) return
     try {
-      if (captchaIdRef.current !== null) {
-        // reset existing to apply theme changes
-        window.grecaptcha.reset(captchaIdRef.current)
-      } else {
-        captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
-          sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
-          theme: theme === 'dark' ? 'dark' : 'light',
-          callback: () => {
-            // token received
-          },
-          'error-callback': () => {
-            setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' })
-          },
-          'expired-callback': () => {
-            setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' })
-          },
-        })
-      }
+      captchaIdRef.current = window.grecaptcha.render(captchaRef.current, {
+        sitekey: import.meta.env.VITE_RECAPTCHA_SITE_KEY,
+        theme: theme === 'dark' ? 'dark' : 'light',
+        callback: () => {},
+        'error-callback': () => setStatus({ type: 'error', msg: 'Помилка reCAPTCHA. Спробуйте ще.' }),
+        'expired-callback': () => setStatus({ type: 'error', msg: 'reCAPTCHA прострочена. Підтвердьте ще раз.' }),
+      })
       setCaptchaReady(true)
-    } catch (e) {
-      // swallow
-    }
+    } catch {}
   }
 
   useEffect(() => {
-    // global onload (declared before script loads in index.html query param)
     window.onRecaptchaLoad = () => {
+      // render after script load
       renderCaptcha()
     }
-    // if script already loaded
     if (window.grecaptcha && window.grecaptcha.render) {
       renderCaptcha()
     }
   }, [])
 
-  // re-render captcha on theme change to update theme (must rebuild widget)
+  // Rebuild captcha on theme change (cannot change theme dynamically; must destroy & re-render)
   useEffect(() => {
-    if (!window.grecaptcha || captchaIdRef.current === null) return
-    // Remove existing iframe container by clearing innerHTML then re-render
-    const container = captchaRef.current
-    if (!container) return
-    container.innerHTML = ''
+    if (!window.grecaptcha || !captchaRef.current) return
+    if (captchaIdRef.current === null) return
+    // mark not ready
+    setCaptchaReady(false)
+    // Remove old container completely instead of innerHTML clear
+    const oldNode = captchaRef.current
+    const parent = oldNode.parentNode
+    if (!parent) return
+    parent.removeChild(oldNode)
+    const newNode = document.createElement('div')
+    captchaRef.current = newNode
+    parent.appendChild(newNode)
     captchaIdRef.current = null
-    renderCaptcha()
+    // Defer re-render slightly to allow DOM paint & avoid race
+    setTimeout(() => {
+      if (window.grecaptcha && window.grecaptcha.render) {
+        renderCaptcha()
+      }
+    }, 60)
   }, [theme])
 
   const handleSubmit = (e) => {
@@ -416,7 +414,7 @@ function App() {
                   required
                   maxLength={2000}
                 />
-                <div ref={captchaRef} className="pt-1" aria-label="reCAPTCHA" />
+                <div ref={captchaRef} id="recaptcha-container" className="pt-1" aria-label="reCAPTCHA" />
                 {status.type && (
                   <div role="status" aria-live="polite" className={`text-sm font-medium ${status.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : status.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-neutral-600 dark:text-neutral-400'}`}>{status.msg}</div>
                 )}
