@@ -49,6 +49,20 @@ function App() {
     }
   }, [])
 
+  // Re-render reCAPTCHA when theme changes (Google widget does not support dynamic theme switch)
+  useEffect(() => {
+    if (!window.grecaptcha) return
+    if (captchaIdRef.current === null) return // not rendered yet
+    // Reset and fully re-render with new theme
+    try { window.grecaptcha.reset(captchaIdRef.current) } catch {}
+    captchaIdRef.current = null
+    setCaptchaReady(false)
+    if (captchaRef.current) {
+      captchaRef.current.innerHTML = ''
+      renderCaptcha()
+    }
+  }, [theme])
+
   const encode = (data) => {
     return Object.keys(data)
       .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
