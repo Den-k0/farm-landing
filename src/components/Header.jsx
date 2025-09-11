@@ -37,18 +37,24 @@ export default function Header({ theme, setTheme, userPreferred, setUserPreferre
           </button>
         </div>
       </div>
-      {menuOpen && (
-        <div id="mobile-nav" className="md:hidden border-t border-black/5 dark:border-white/10 bg-white/70 dark:bg-neutral-900/60 backdrop-blur" role="dialog" aria-label="Мобільна навігація">
-          <div className="px-4 py-3 space-y-2">
-            <a href="#about" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Про нас</a>
-            <a href="#crops" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Рослинництво</a>
-            <a href="#livestock" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Тваринництво</a>
-            <a href="#social" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Соцвідповідальність</a>
-            <a href="#gallery" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Фото</a>
-            <a href="#contact" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Контакти</a>
-          </div>
+      <div
+        id="mobile-nav"
+        className={`md:hidden border-t border-black/5 dark:border-white/10 bg-white/70 dark:bg-neutral-900/60 backdrop-blur origin-top transition-all duration-300 ease-out overflow-hidden ${
+          menuOpen ? 'opacity-100 max-h-[420px]' : 'opacity-0 max-h-0 pointer-events-none'
+        }`}
+        role="dialog"
+        aria-label="Мобільна навігація"
+        aria-hidden={!menuOpen}
+      >
+        <div className="px-4 py-3 space-y-2">
+          <a href="#about" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Про нас</a>
+          <a href="#crops" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Рослинництво</a>
+          <a href="#livestock" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Тваринництво</a>
+          <a href="#social" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Соцвідповідальність</a>
+          <a href="#gallery" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Фото</a>
+          <a href="#contact" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Контакти</a>
         </div>
-      )}
+      </div>
     </header>
   )
 }
