@@ -16,7 +16,6 @@ export default function Header({ theme, setTheme, userPreferred, setUserPreferre
           <a href="#crops" className="hover:text-black dark:hover:text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Рослинництво</a>
           <a href="#livestock" className="hover:text-black dark:hover:text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Тваринництво</a>
           <a href="#social" className="hover:text-black dark:hover:text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Соцвідповідальність</a>
-          <a href="#team" className="hover:text-black dark:hover:text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Команда</a>
           <a href="#gallery" className="hover:text-black dark:hover:text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Фото</a>
           <a href="#contact" className="hover:text-black dark:hover:text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Контакти</a>
         </nav>
@@ -45,7 +44,6 @@ export default function Header({ theme, setTheme, userPreferred, setUserPreferre
             <a href="#crops" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Рослинництво</a>
             <a href="#livestock" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Тваринництво</a>
             <a href="#social" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Соцвідповідальність</a>
-            <a href="#team" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Команда</a>
             <a href="#gallery" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Фото</a>
             <a href="#contact" className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 rounded">Контакти</a>
           </div>
