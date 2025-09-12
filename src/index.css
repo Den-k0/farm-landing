@@ -3,6 +3,10 @@
 /* Force dark variant to use the `.dark` class on <html> (works in Tailwind v4) */
 @custom-variant dark (html.dark &);
 
+/* Smooth scrolling for in-page anchor navigation (respects reduced motion) */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
 /* Custom utilities for the landing visuals */
 @keyframes gradient {
   0% { background-position: 0% 50%; }
